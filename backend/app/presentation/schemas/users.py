@@ -47,3 +47,24 @@ class RefreshRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     refresh_token: str = Field(min_length=32, max_length=256)
+
+
+class ForgotPasswordRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    token: str
+    new_password: str = Field(
+        min_length=12,
+        max_length=128,
+        alias="nova_senha",
+    )
+
+
+class MessageResponse(BaseModel):
+    detail: str

@@ -1,3 +1,6 @@
+from datetime import datetime
+from uuid import UUID
+
 import asyncpg
 
 from app.domain.entity.user import User
@@ -60,6 +63,56 @@ class PostgresUserRepository(IUserRepository):
         if row is None:
             raise RuntimeError("Database did not return the inserted user")
         return self._to_entity(row)
+
+    async def store_password_reset_token(
+        self, *, user_id: UUID, token_hash: str, expires_at: datetime
+    ) -> None:
+        await self._pool.execute(
+            "DELETE FROM password_reset_tokens WHERE expires_at <= now()"
+        )
+        await self._pool.execute(
+            """
+            INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+            VALUES ($1, $2, $3)
+            """,
+            user_id,
+            token_hash,
+            expires_at,
+        )
+
+    async def reset_password(self, *, token_hash: str, password_hash: str) -> bool:
+        async with self._pool.acquire() as connection:
+            async with connection.transaction():
+                token = await connection.fetchrow(
+                    """
+                    SELECT user_id
+                    FROM password_reset_tokens
+                    WHERE token_hash = $1 AND expires_at > now()
+                    FOR UPDATE
+                    """,
+                    token_hash,
+                )
+                if token is None:
+                    return False
+
+                await connection.execute(
+                    "UPDATE users SET password_hash = $2 WHERE id = $1",
+                    token["user_id"],
+                    password_hash,
+                )
+                await connection.execute(
+                    "DELETE FROM password_reset_tokens WHERE user_id = $1",
+                    token["user_id"],
+                )
+                await connection.execute(
+                    """
+                    UPDATE refresh_tokens
+                    SET revoked_at = COALESCE(revoked_at, now())
+                    WHERE user_id = $1
+                    """,
+                    token["user_id"],
+                )
+                return True
 
     @staticmethod
     def _to_entity(row: asyncpg.Record) -> User:

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 from urllib.parse import quote, urlsplit, urlunsplit
 
 from pydantic import Field, SecretStr
@@ -17,8 +18,17 @@ class Settings(BaseSettings):
     database_min_pool_size: int = 1
     database_max_pool_size: int = 10
     secret_key: str = Field(min_length=32)
+    algorithm: Literal["HS256"] = "HS256"
     access_token_expire_minutes: int = Field(default=30, gt=0)
     refresh_token_expire_days: int = Field(default=7, gt=0)
+    reset_password_token_expire_minutes: int = Field(default=5, gt=0)
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, gt=0, le=65535)
+    smtp_user: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    emails_from_email: str = ""
+    emails_from_name: str = "Suporte Manutenção"
+    frontend_url: str = "http://localhost:3000/reset-password"
 
     @property
     def database_dsn(self) -> str:
@@ -52,3 +62,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def get_settings() -> Settings:
+    return settings
