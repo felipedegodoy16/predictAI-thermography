@@ -1,0 +1,10 @@
+from enum import StrEnum
+
+
+class StatusOrdemServico(StrEnum):
+    BACKLOG = "BACKLOG"
+    EM_ANDAMENTO = "EM_ANDAMENTO"
+    AGUARDANDO_PECA = "AGUARDANDO_PECA"
+    EM_REVISAO = "EM_REVISAO"
+    CONCLUIDO = "CONCLUIDO"
+    CANCELADO = "CANCELADO"
