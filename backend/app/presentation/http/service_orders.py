@@ -3,45 +3,45 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.domain.entity.ordem_servico import StatusOrdemServico
-from app.infrastructure.persistence.postgres_ordem_servico_repository import (
-    PostgresOrdemServicoRepository,
+from app.domain.entity.service_order import ServiceOrderStatus
+from app.infrastructure.persistence.postgres_service_order_repository import (
+    PostgresServiceOrderRepository,
 )
 from app.presentation.http.dependencies import (
     AuthenticatedUser,
     get_current_user,
-    get_ordem_servico_repository,
+    get_service_order_repository,
 )
-from app.presentation.schemas.ordens_servico import (
+from app.presentation.schemas.service_orders import (
     ChecklistItemCreate,
     ChecklistItemResponse,
     ChecklistItemUpdate,
     KanbanBoardResponse,
-    OrdemServicoCreate,
-    OrdemServicoResponse,
-    OrdemServicoStatusUpdate,
-    OrdemServicoUpdate,
+    ServiceOrderCreate,
+    ServiceOrderResponse,
+    ServiceOrderStatusUpdate,
+    ServiceOrderUpdate,
 )
 
 router = APIRouter()
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 Repository = Annotated[
-    PostgresOrdemServicoRepository, Depends(get_ordem_servico_repository)
+    PostgresServiceOrderRepository, Depends(get_service_order_repository)
 ]
 
 
 @router.post(
     "/",
-    response_model=OrdemServicoResponse,
+    response_model=ServiceOrderResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Criar ordem de serviço",
     description="Cria uma OS e, opcionalmente, seus itens iniciais de checklist.",
 )
-async def criar_ordem_servico(
-    payload: OrdemServicoCreate, _: CurrentUser, repo: Repository
-) -> OrdemServicoResponse:
+async def create_service_order(
+    payload: ServiceOrderCreate, _: CurrentUser, repo: Repository
+) -> ServiceOrderResponse:
     try:
-        return OrdemServicoResponse.model_validate(
+        return ServiceOrderResponse.model_validate(
             await repo.create(payload.model_dump())
         )
     except Exception as error:
@@ -54,148 +54,148 @@ async def criar_ordem_servico(
     summary="Obter quadro Kanban",
     description="Retorna as ordens agrupadas por status.",
 )
-async def obter_kanban(_: CurrentUser, repo: Repository) -> KanbanBoardResponse:
+async def get_kanban_board(_: CurrentUser, repo: Repository) -> KanbanBoardResponse:
     board = await repo.kanban()
     return KanbanBoardResponse(
-        colunas={key: [OrdemServicoResponse.model_validate(item) for item in items]
+        columns={key: [ServiceOrderResponse.model_validate(item) for item in items]
                  for key, items in board.items()}
     )
 
 
 @router.get(
     "/",
-    response_model=list[OrdemServicoResponse],
+    response_model=list[ServiceOrderResponse],
     summary="Listar ordens de serviço",
     description="Lista OSs com filtros e paginação.",
 )
-async def listar_ordens_servico(
+async def list_service_orders(
     _: CurrentUser,
     repo: Repository,
-    status_os: Annotated[StatusOrdemServico | None, Query(alias="status")] = None,
-    tecnico_id: UUID | None = None,
-    prioridade: str | None = Query(default=None, pattern=r"^(BAIXA|MEDIA|ALTA|CRITICA)$"),
+    status_filter: Annotated[ServiceOrderStatus | None, Query(alias="status")] = None,
+    technician_id: UUID | None = Query(default=None, alias="tecnico_id"),
+    priority: str | None = Query(default=None, pattern=r"^(BAIXA|MEDIA|ALTA|CRITICA)$"),
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
-) -> list[OrdemServicoResponse]:
+) -> list[ServiceOrderResponse]:
     rows = await repo.list(
-        status=status_os, tecnico_id=tecnico_id, prioridade=prioridade,
+        status=status_filter, technician_id=technician_id, priority=priority,
         skip=skip, limit=limit,
     )
-    return [OrdemServicoResponse.model_validate(row) for row in rows]
+    return [ServiceOrderResponse.model_validate(row) for row in rows]
 
 
 @router.get(
-    "/{os_id}",
-    response_model=OrdemServicoResponse,
+    "/{service_order_id}",
+    response_model=ServiceOrderResponse,
     summary="Obter ordem de serviço",
     description="Retorna os dados completos da OS e seu checklist ordenado.",
 )
-async def obter_ordem_servico(
-    os_id: int, _: CurrentUser, repo: Repository
-) -> OrdemServicoResponse:
-    row = await repo.get(os_id)
+async def get_service_order(
+    service_order_id: int, _: CurrentUser, repo: Repository
+) -> ServiceOrderResponse:
+    row = await repo.get(service_order_id)
     if row is None:
         raise _not_found("Ordem de serviço não encontrada.")
-    return OrdemServicoResponse.model_validate(row)
+    return ServiceOrderResponse.model_validate(row)
 
 
 @router.patch(
-    "/{os_id}/status",
-    response_model=OrdemServicoResponse,
+    "/{service_order_id}/status",
+    response_model=ServiceOrderResponse,
     summary="Mover ordem no Kanban",
     description="Atualiza o status e valida os itens obrigatórios antes da conclusão.",
 )
-async def atualizar_status(
-    os_id: int,
-    payload: OrdemServicoStatusUpdate,
+async def update_status(
+    service_order_id: int,
+    payload: ServiceOrderStatusUpdate,
     _: CurrentUser,
     repo: Repository,
-) -> OrdemServicoResponse:
+) -> ServiceOrderResponse:
     try:
-        row = await repo.update_status(os_id, payload.status, payload.justificativa)
+        row = await repo.update_status(service_order_id, payload.status, payload.reason)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     if row is None:
         raise _not_found("Ordem de serviço não encontrada.")
-    return OrdemServicoResponse.model_validate(row)
+    return ServiceOrderResponse.model_validate(row)
 
 
 @router.put(
-    "/{os_id}",
-    response_model=OrdemServicoResponse,
+    "/{service_order_id}",
+    response_model=ServiceOrderResponse,
     summary="Atualizar ordem de serviço",
     description="Atualiza os dados gerais de uma OS.",
 )
-async def atualizar_ordem_servico(
-    os_id: int,
-    payload: OrdemServicoUpdate,
+async def update_service_order(
+    service_order_id: int,
+    payload: ServiceOrderUpdate,
     _: CurrentUser,
     repo: Repository,
-) -> OrdemServicoResponse:
+) -> ServiceOrderResponse:
     try:
-        row = await repo.update(os_id, payload.model_dump(exclude_unset=True))
+        row = await repo.update(service_order_id, payload.model_dump(exclude_unset=True))
     except Exception as error:
         _raise_database_error(error)
     if row is None:
         raise _not_found("Ordem de serviço não encontrada.")
-    return OrdemServicoResponse.model_validate(row)
+    return ServiceOrderResponse.model_validate(row)
 
 
 @router.post(
-    "/{os_id}/checklist",
-    response_model=OrdemServicoResponse,
+    "/{service_order_id}/checklist",
+    response_model=ServiceOrderResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Adicionar itens ao checklist",
     description="Adiciona um ou mais itens ao checklist da OS.",
 )
-async def adicionar_checklist(
-    os_id: int,
-    itens: list[ChecklistItemCreate],
+async def add_checklist_items(
+    service_order_id: int,
+    items: list[ChecklistItemCreate],
     _: CurrentUser,
     repo: Repository,
-) -> OrdemServicoResponse:
+) -> ServiceOrderResponse:
     row = await repo.add_checklist(
-        os_id, [item.model_dump() for item in itens]
+        service_order_id, [item.model_dump() for item in items]
     )
     if row is None:
         raise _not_found("Ordem de serviço não encontrada.")
-    return OrdemServicoResponse.model_validate(row)
+    return ServiceOrderResponse.model_validate(row)
 
 
 @router.patch(
-    "/{os_id}/checklist/{item_id}",
+    "/{service_order_id}/checklist/{item_id}",
     response_model=ChecklistItemResponse,
     summary="Atualizar item do checklist",
     description="Atualiza o item e registra ou remove seu timestamp de conclusão.",
 )
-async def atualizar_item_checklist(
-    os_id: int,
+async def update_checklist_item(
+    service_order_id: int,
     item_id: int,
     payload: ChecklistItemUpdate,
     _: CurrentUser,
     repo: Repository,
 ) -> ChecklistItemResponse:
     row = await repo.update_checklist(
-        os_id, item_id, payload.model_dump(exclude_unset=True)
+        service_order_id, item_id, payload.model_dump(exclude_unset=True)
     )
     if row is None:
         raise _not_found("Item de checklist não encontrado.")
-    item = next((entry for entry in row["checklist_itens"] if entry["id"] == item_id), None)
+    item = next((entry for entry in row["checklist_items"] if entry["id"] == item_id), None)
     if item is None:
         raise _not_found("Item de checklist não encontrado.")
     return ChecklistItemResponse.model_validate(item)
 
 
 @router.delete(
-    "/{os_id}/checklist/{item_id}",
+    "/{service_order_id}/checklist/{item_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remover item do checklist",
     description="Remove um item do checklist da OS.",
 )
-async def remover_item_checklist(
-    os_id: int, item_id: int, _: CurrentUser, repo: Repository
+async def delete_checklist_item(
+    service_order_id: int, item_id: int, _: CurrentUser, repo: Repository
 ) -> None:
-    if not await repo.delete_checklist(os_id, item_id):
+    if not await repo.delete_checklist(service_order_id, item_id):
         raise _not_found("Item de checklist não encontrado.")
 
 

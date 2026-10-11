@@ -1,5 +1,5 @@
-from typing import Annotated
 from dataclasses import dataclass
+from typing import Annotated
 from uuid import UUID
 
 import asyncpg
@@ -7,19 +7,19 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.application.ports.password_hasher import PasswordHasher
-from app.application.use_cases.users.create_user import CreateUser
 from app.application.use_cases.users.authenticate_user import AuthenticateUser
-from app.infrastructure.security.access_tokens import verify_access_token
+from app.application.use_cases.users.create_user import CreateUser
 from app.domain.repositories.user_repository import IUserRepository
 from app.infrastructure.database.postgres import Database
+from app.infrastructure.security.access_tokens import verify_access_token
 from app.infrastructure.persistence.postgres_user_repository import (
     PostgresUserRepository,
 )
 from app.infrastructure.persistence.postgres_refresh_token_repository import (
     PostgresRefreshTokenRepository,
 )
-from app.infrastructure.persistence.postgres_ordem_servico_repository import (
-    PostgresOrdemServicoRepository,
+from app.infrastructure.persistence.postgres_service_order_repository import (
+    PostgresServiceOrderRepository,
 )
 from app.infrastructure.security.argon2_password_hasher import Argon2PasswordHasher
 
@@ -89,10 +89,10 @@ def get_refresh_token_repository(
     return PostgresRefreshTokenRepository(pool)
 
 
-def get_ordem_servico_repository(
+def get_service_order_repository(
     pool: Annotated[asyncpg.Pool, Depends(get_pool)],
-) -> PostgresOrdemServicoRepository:
-    return PostgresOrdemServicoRepository(pool)
+) -> PostgresServiceOrderRepository:
+    return PostgresServiceOrderRepository(pool)
 
 
 def get_password_hasher() -> PasswordHasher:
@@ -118,7 +118,7 @@ __all__ = [
     "get_authenticate_user_use_case",
     "get_create_user_use_case",
     "get_current_user",
-    "get_ordem_servico_repository",
+    "get_service_order_repository",
     "get_refresh_token_repository",
     "require_permissions",
 ]

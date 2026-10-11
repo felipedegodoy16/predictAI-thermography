@@ -1,0 +1,10 @@
+from enum import StrEnum
+
+
+class ServiceOrderStatus(StrEnum):
+    BACKLOG = "BACKLOG"
+    IN_PROGRESS = "EM_ANDAMENTO"
+    WAITING_FOR_PART = "AGUARDANDO_PECA"
+    UNDER_REVIEW = "EM_REVISAO"
+    COMPLETED = "CONCLUIDO"
+    CANCELLED = "CANCELADO"
