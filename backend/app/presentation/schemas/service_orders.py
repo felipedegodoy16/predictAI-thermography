@@ -16,7 +16,7 @@ ServiceOrderPriority = Annotated[
 class ChecklistItemCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    description: Annotated[str, Field(min_length=1, alias="descricao")]
+    description: Annotated[str, Field(min_length=1)] = Field(alias="descricao")
     required: bool = Field(default=True, alias="obrigatorio")
     sort_order: int = Field(default=0, alias="ordem")
 
@@ -26,7 +26,9 @@ class ChecklistItemUpdate(BaseModel):
 
     completed: bool | None = Field(default=None, alias="concluido")
     technician_note: str | None = Field(default=None, alias="observacao_tecnico")
-    description: Annotated[str, Field(min_length=1, alias="descricao")] | None = None
+    description: Annotated[str, Field(min_length=1)] | None = Field(
+        default=None, alias="descricao"
+    )
     required: bool | None = Field(default=None, alias="obrigatorio")
     sort_order: int | None = Field(default=None, alias="ordem")
 
@@ -47,8 +49,8 @@ class ChecklistItemResponse(BaseModel):
 class ServiceOrderCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    title: Annotated[str, Field(min_length=1, max_length=200, alias="titulo")]
-    description: Annotated[str, Field(min_length=1, alias="descricao")]
+    title: Annotated[str, Field(min_length=1, max_length=200)] = Field(alias="titulo")
+    description: Annotated[str, Field(min_length=1)] = Field(alias="descricao")
     priority: ServiceOrderPriority = Field(alias="prioridade")
     client_id: UUID = Field(alias="cliente_id")
     technician_id: UUID | None = Field(default=None, alias="tecnico_id")
@@ -59,8 +61,12 @@ class ServiceOrderCreate(BaseModel):
 class ServiceOrderUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    title: Annotated[str, Field(min_length=1, max_length=200, alias="titulo")] | None = None
-    description: Annotated[str, Field(min_length=1, alias="descricao")] | None = None
+    title: Annotated[str, Field(min_length=1, max_length=200)] | None = Field(
+        default=None, alias="titulo"
+    )
+    description: Annotated[str, Field(min_length=1)] | None = Field(
+        default=None, alias="descricao"
+    )
     priority: ServiceOrderPriority | None = Field(default=None, alias="prioridade")
     client_id: UUID | None = Field(default=None, alias="cliente_id")
     technician_id: UUID | None = Field(default=None, alias="tecnico_id")
