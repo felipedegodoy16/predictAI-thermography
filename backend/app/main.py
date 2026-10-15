@@ -1,7 +1,9 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
@@ -29,6 +31,28 @@ def create_app(database: Database | None = None) -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         lifespan=lifespan,
+    )
+    frontend_url = urlsplit(settings.frontend_url)
+    allowed_origins: list[str] = []
+    if frontend_url.scheme and frontend_url.netloc:
+        frontend_origin = f"{frontend_url.scheme}://{frontend_url.netloc}"
+        allowed_origins.append(frontend_origin)
+        frontend_port = f":{frontend_url.port}" if frontend_url.port else ""
+        if frontend_url.hostname == "localhost":
+            allowed_origins.append(
+                f"{frontend_url.scheme}://127.0.0.1{frontend_port}"
+            )
+        elif frontend_url.hostname == "127.0.0.1":
+            allowed_origins.append(
+                f"{frontend_url.scheme}://localhost{frontend_port}"
+            )
+
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     application.state.database = db
     application.include_router(api_router, prefix="/api/v1")
