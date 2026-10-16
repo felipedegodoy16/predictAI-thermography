@@ -103,8 +103,8 @@ class PostgresServiceOrderRepository:
                     raise ValueError("Required checklist items are still pending.")
             closed_at = datetime.now(timezone.utc) if new_status == ServiceOrderStatus.COMPLETED else None
             updated = await conn.fetchrow(
-                """UPDATE service_orders SET status = $2,
-                   completed_at = CASE WHEN $2 = 'CONCLUIDO' THEN $3 ELSE NULL END,
+                """UPDATE service_orders SET status = $2::varchar,
+                   completed_at = $3::timestamptz,
                    status_note = $4
                    WHERE id = $1 RETURNING *""",
                 service_order_id, new_status.value, closed_at, reason,

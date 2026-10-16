@@ -107,4 +107,6 @@ class ServiceOrderResponse(BaseModel):
 
 
 class KanbanBoardResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     columns: dict[ServiceOrderStatus, list[ServiceOrderResponse]] = Field(alias="colunas")
