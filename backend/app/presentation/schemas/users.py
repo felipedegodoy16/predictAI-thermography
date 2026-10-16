@@ -19,6 +19,27 @@ class UserCreate(BaseModel):
         return value
 
 
+class UserUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    email: EmailStr | None = None
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            raise ValueError("Name must not be blank")
+        return value
+
+    @field_validator("email")
+    @classmethod
+    def email_must_not_be_null(cls, value: EmailStr | None) -> EmailStr | None:
+        if value is None:
+            raise ValueError("Email must not be null")
+        return value
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

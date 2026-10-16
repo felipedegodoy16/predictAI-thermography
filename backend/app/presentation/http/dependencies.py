@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.application.ports.password_hasher import PasswordHasher
 from app.application.use_cases.users.authenticate_user import AuthenticateUser
 from app.application.use_cases.users.create_user import CreateUser
+from app.application.use_cases.users.update_user import UpdateUser
 from app.domain.repositories.user_repository import IUserRepository
 from app.infrastructure.database.postgres import Database
 from app.infrastructure.security.access_tokens import verify_access_token
@@ -106,6 +107,12 @@ def get_create_user_use_case(
     return CreateUser(repository=repository, password_hasher=password_hasher)
 
 
+def get_update_user_use_case(
+    repository: Annotated[IUserRepository, Depends(get_user_repository)],
+) -> UpdateUser:
+    return UpdateUser(repository=repository)
+
+
 def get_authenticate_user_use_case(
     repository: Annotated[IUserRepository, Depends(get_user_repository)],
     password_hasher: Annotated[PasswordHasher, Depends(get_password_hasher)],
@@ -117,6 +124,7 @@ __all__ = [
     "AuthenticatedUser",
     "get_authenticate_user_use_case",
     "get_create_user_use_case",
+    "get_update_user_use_case",
     "get_current_user",
     "get_service_order_repository",
     "get_refresh_token_repository",

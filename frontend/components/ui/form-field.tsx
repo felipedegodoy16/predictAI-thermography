@@ -20,7 +20,7 @@ export function Label({
   return (
     <label
       htmlFor={htmlFor}
-      className="mb-2 block text-sm font-medium text-slate-700"
+      className="mb-1.5 block text-xs font-medium text-slate-700"
     >
       {children}
       {required ? <span className="ml-1 text-brand-accent" aria-hidden="true">*</span> : null}
@@ -63,7 +63,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
             aria-invalid={Boolean(error)}
             aria-describedby={error ? errorId : inputProps["aria-describedby"]}
             className={
-              "min-h-12 w-full rounded-lg border bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10 disabled:bg-slate-50 " +
+              "min-h-11 w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10 disabled:bg-slate-50 " +
               (Icon ? "pl-11 " : "") +
               (trailing ? "pr-12 " : "") +
               (error

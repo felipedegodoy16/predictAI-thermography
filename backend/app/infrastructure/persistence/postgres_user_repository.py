@@ -32,6 +32,55 @@ class PostgresUserRepository(IUserRepository):
         )
         return self._to_entity(row) if row is not None else None
 
+    async def list_users(
+        self, *, limit: int, offset: int, query: str | None = None
+    ) -> list[User]:
+        rows = await self._pool.fetch(
+            """
+            SELECT u.id, u.name, u.email, u.password_hash, u.created_at,
+                   COALESCE(
+                       array_agg(DISTINCT p.code)
+                           FILTER (WHERE p.code IS NOT NULL),
+                       ARRAY[]::TEXT[]
+                   ) AS permissions
+            FROM users AS u
+            LEFT JOIN user_roles AS ur ON ur.user_id = u.id
+            LEFT JOIN role_permissions AS rp ON rp.role_id = ur.role_id
+            LEFT JOIN permissions AS p ON p.code = rp.permission_code
+            WHERE $1::TEXT IS NULL
+               OR u.name ILIKE '%' || $1 || '%'
+               OR u.email ILIKE '%' || $1 || '%'
+            GROUP BY u.id
+            ORDER BY u.created_at DESC, u.id
+            LIMIT $2 OFFSET $3
+            """,
+            query,
+            limit,
+            offset,
+        )
+        return [self._to_entity(row) for row in rows]
+
+    async def update_profile(
+        self, *, user_id: UUID, name: str | None, email: str | None
+    ) -> User | None:
+        try:
+            row = await self._pool.fetchrow(
+                """
+                UPDATE users
+                SET name = COALESCE($2, name),
+                    email = COALESCE($3, email)
+                WHERE id = $1
+                RETURNING id, name, email, password_hash, created_at,
+                          ARRAY[]::TEXT[] AS permissions
+                """,
+                user_id,
+                name,
+                email,
+            )
+        except asyncpg.UniqueViolationError as error:
+            raise UserAlreadyExistsError(email or "") from error
+        return self._to_entity(row) if row is not None else None
+
     async def add(self, user: User) -> User:
         try:
             async with self._pool.acquire() as connection:

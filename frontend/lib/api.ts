@@ -12,6 +12,18 @@ export interface MessageResponse {
   detail: string;
 }
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  created_at: string;
+}
+
+export interface UserUpdateInput {
+  name?: string;
+  email?: string;
+}
+
 export type ServiceOrderStatus =
   | "BACKLOG"
   | "EM_ANDAMENTO"
@@ -222,6 +234,33 @@ export function resetPassword(payload: {
 }): Promise<MessageResponse> {
   return request<MessageResponse>("/auth/reset-password", {
     body: { token: payload.token, nova_senha: payload.newPassword },
+  });
+}
+
+export function listUsers(params: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+} = {}): Promise<User[]> {
+  const query = new URLSearchParams();
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.offset !== undefined) query.set("offset", String(params.offset));
+  if (params.search) query.set("search", params.search);
+  const suffix = query.size ? `?${query.toString()}` : "";
+  return request<User[]>(`/users${suffix}`, {
+    method: "GET",
+    authenticated: true,
+  });
+}
+
+export function updateUser(
+  id: string,
+  changes: UserUpdateInput,
+): Promise<User> {
+  return request<User>(`/users/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: changes,
+    authenticated: true,
   });
 }
 
