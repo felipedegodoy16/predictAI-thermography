@@ -1,6 +1,6 @@
-# ThermoMonitor frontend
+# PredictAI frontend
 
-Frontend de autenticação do ThermoMonitor, separado do serviço FastAPI em backend/.
+Frontend de autenticação e gestão de manutenção do PredictAI, separado do serviço FastAPI em backend/.
 
 ## Requisitos
 
@@ -23,6 +23,11 @@ Abra http://localhost:3000. Ajuste NEXT_PUBLIC_API_BASE_URL em .env.local se a A
 - /login
 - /forgot-password
 - /reset-password?token=...
-- /kanban (destino temporário após autenticação)
+- /kanban (ordens de serviço)
+- /usuarios (protótipo de gestão de usuários)
+
+O Kanban usa os endpoints de ordens de serviço disponíveis na API, incluindo checklist e atualização de status. No formulário de OS, cliente e técnico são vinculados pelo UUID da conta porque a API ainda não oferece catálogos para seleção de usuários ou equipamentos.
+
+A tela de usuários usa registros de demonstração. A API atual permite apenas criar uma conta básica; listagem, edição, controle de status, perfis e permissões ainda precisam ser implementados no backend. As ações dessa tela não são persistidas.
 
 Os tokens retornados pelo backend ficam em sessionStorage, limitados à sessão da aba. Para uma sessão persistente com proteção contra acesso por JavaScript, a API deverá futuramente emitir cookies HttpOnly, Secure e SameSite.

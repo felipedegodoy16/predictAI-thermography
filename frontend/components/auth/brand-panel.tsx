@@ -1,11 +1,10 @@
 import {
-  Activity,
   BarChart3,
-  CheckCircle2,
+  CalendarDays,
   Mail,
   Send,
-  Settings,
-  ShieldCheck,
+  TrendingUp,
+  Wrench,
 } from "lucide-react";
 import { BrandLogo } from "@/components/auth/brand-logo";
 
@@ -13,9 +12,9 @@ export type AuthVariant = "login" | "forgot" | "reset";
 
 const copy: Record<AuthVariant, { title: string; description: string }> = {
   login: {
-    title: "Segurança térmica para a sua operação.",
+    title: "Manutenção inteligente para sua operação.",
     description:
-      "Monitore, analise e previna falhas em equipamentos industriais com tecnologia e inteligência.",
+      "Planeje a manutenção preventiva, antecipe falhas com análises preditivas e organize os serviços corretivos em uma só plataforma.",
   },
   forgot: {
     title: "Esqueceu sua senha?",
@@ -25,25 +24,25 @@ const copy: Record<AuthVariant, { title: string; description: string }> = {
   reset: {
     title: "Crie uma nova senha.",
     description:
-      "Escolha uma senha forte para voltar a acessar o monitoramento da sua operação.",
+      "Escolha uma senha forte para voltar a organizar a manutenção da sua operação.",
   },
 };
 
 const benefits = [
   {
-    icon: ShieldCheck,
-    title: "Mais segurança",
-    description: "Evite paradas não programadas.",
+    icon: CalendarDays,
+    title: "Preventiva planejada",
+    description: "Inspeções e rotinas no prazo.",
   },
   {
-    icon: BarChart3,
-    title: "Dados em tempo real",
-    description: "Decisões mais rápidas e assertivas.",
+    icon: TrendingUp,
+    title: "Preditiva por dados",
+    description: "Antecipe falhas e reduza paradas.",
   },
   {
-    icon: Settings,
-    title: "Alta performance",
-    description: "Mantenha sua operação no máximo.",
+    icon: Wrench,
+    title: "Corretiva organizada",
+    description: "Priorize ordens e acompanhe reparos.",
   },
 ];
 
@@ -97,7 +96,7 @@ export function BrandPanel({ variant }: { variant: AuthVariant }) {
       <div className="relative z-10">
         <BrandLogo light compact />
         <p className="mt-5 max-w-xs text-sm leading-6 text-teal-50/75">
-          Monitoramento térmico inteligente para um futuro mais seguro.
+          Gestão de manutenção integrada para operações mais confiáveis.
         </p>
       </div>
 
@@ -106,9 +105,9 @@ export function BrandPanel({ variant }: { variant: AuthVariant }) {
         <h1 className="text-[1.75rem] font-semibold leading-tight tracking-tight sm:text-3xl">
           {variant === "login" ? (
             <>
-              Segurança térmica
+              Manutenção inteligente
               <br />
-              para a sua <span className="text-teal-300">operação.</span>
+              para sua <span className="text-teal-300">operação.</span>
             </>
           ) : (
             <span>
@@ -156,8 +155,8 @@ export function BrandPanel({ variant }: { variant: AuthVariant }) {
       )}
 
       <div className="relative z-10 mt-auto hidden pt-8 text-xs text-teal-50/65 lg:block">
-        <Activity aria-hidden="true" className="mr-2 inline size-4 text-teal-300" />
-        Monitoramento contínuo. Decisões mais seguras.
+        <BarChart3 aria-hidden="true" className="mr-2 inline size-4 text-teal-300" />
+        Corretiva, preventiva e preditiva em um só lugar.
       </div>
     </aside>
   );

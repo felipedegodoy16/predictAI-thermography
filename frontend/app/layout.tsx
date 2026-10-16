@@ -4,10 +4,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "ThermoMonitor",
-    template: "%s | ThermoMonitor",
+    default: "PredictAI",
+    template: "%s | PredictAI",
   },
-  description: "Monitoramento térmico inteligente para operações industriais.",
+  description:
+    "Gestão de manutenção corretiva, preventiva e preditiva para operações industriais.",
 };
 
 export default function RootLayout({

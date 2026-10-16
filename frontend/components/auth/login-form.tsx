@@ -14,7 +14,7 @@ import { ApiError, login } from "@/lib/api";
 import { saveAuthSession } from "@/lib/auth-session";
 import { loginSchema, type LoginFormValues } from "@/lib/validators";
 
-const REMEMBERED_EMAIL_KEY = "thermomonitor.remembered-email";
+const REMEMBERED_EMAIL_KEY = "predictai.remembered-email";
 
 export function LoginForm() {
   const router = useRouter();

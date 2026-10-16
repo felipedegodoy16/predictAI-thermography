@@ -1,3 +1,5 @@
+import { getAuthSession } from "@/lib/auth-session";
+
 export interface TokenResponse {
   access_token: string;
   refresh_token: string;
@@ -8,6 +10,59 @@ export interface TokenResponse {
 
 export interface MessageResponse {
   detail: string;
+}
+
+export type ServiceOrderStatus =
+  | "BACKLOG"
+  | "EM_ANDAMENTO"
+  | "AGUARDANDO_PECA"
+  | "EM_REVISAO"
+  | "CONCLUIDO"
+  | "CANCELADO";
+
+export type ServiceOrderPriority = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
+
+export interface ChecklistItem {
+  id: number;
+  serviceOrderId: number;
+  description: string;
+  required: boolean;
+  completed: boolean;
+  technicianNote: string | null;
+  completedAt: string | null;
+  sortOrder: number;
+}
+
+export interface ServiceOrder {
+  id: number;
+  code: string;
+  title: string;
+  description: string;
+  status: ServiceOrderStatus;
+  priority: ServiceOrderPriority;
+  clientId: string;
+  technicianId: string | null;
+  createdAt: string;
+  dueAt: string | null;
+  completedAt: string | null;
+  statusNote: string | null;
+  checklistItems: ChecklistItem[];
+}
+
+export interface ChecklistItemInput {
+  description: string;
+  required: boolean;
+  sortOrder: number;
+}
+
+export interface ServiceOrderInput {
+  title: string;
+  description: string;
+  priority: ServiceOrderPriority;
+  clientId: string;
+  technicianId?: string;
+  dueAt?: string;
+  checklistItems: ChecklistItemInput[];
 }
 
 export class ApiError extends Error {
@@ -27,7 +82,7 @@ const API_BASE_URL = (
 function describeError(value: unknown): string {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) {
-    const messages = value
+    return value
       .map((item) => {
         if (!item || typeof item !== "object") return "";
         const record = item as { msg?: unknown; loc?: unknown };
@@ -36,23 +91,37 @@ function describeError(value: unknown): string {
           typeof record.msg === "string" ? record.msg : "Valor inválido";
         return field ? String(field) + ": " + message : message;
       })
-      .filter(Boolean);
-    return messages.join(" ");
+      .filter(Boolean)
+      .join(" ");
   }
   return "Não foi possível concluir a solicitação.";
 }
 
 async function request<T>(
   path: string,
-  body: Record<string, string>,
+  options: {
+    method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+    body?: unknown;
+    authenticated?: boolean;
+  } = {},
 ): Promise<T> {
-  let response: Response;
+  const method = options.method ?? "POST";
+  const headers = new Headers();
+  if (options.body !== undefined) headers.set("Content-Type", "application/json");
+  if (options.authenticated) {
+    const session = getAuthSession();
+    if (!session?.access_token) {
+      throw new ApiError("Sua sessão expirou. Entre novamente.", 401);
+    }
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+  }
 
+  let response: Response;
   try {
     response = await fetch(API_BASE_URL + path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      method,
+      headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
       cache: "no-store",
     });
   } catch {
@@ -62,15 +131,18 @@ async function request<T>(
     );
   }
 
-  const result: unknown = await response.json().catch(() => null);
+  const result: unknown =
+    response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     const detail =
       result && typeof result === "object" && "detail" in result
         ? (result as { detail: unknown }).detail
         : undefined;
-    const message = describeError(detail);
-    if (response.status === 401) {
+    if (response.status === 401 && path === "/auth/login") {
       throw new ApiError("E-mail ou senha incorretos.", response.status);
+    }
+    if (response.status === 401) {
+      throw new ApiError("Sua sessão expirou. Entre novamente.", response.status);
     }
     if (response.status === 400 && path === "/auth/reset-password") {
       throw new ApiError(
@@ -78,23 +150,70 @@ async function request<T>(
         response.status,
       );
     }
-    throw new ApiError(message, response.status);
+    throw new ApiError(describeError(detail), response.status);
   }
-
   return result as T;
+}
+
+function valueOf(record: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const key of keys) {
+    if (record[key] !== undefined) return record[key];
+  }
+  return undefined;
+}
+
+function normalizeChecklistItem(value: unknown): ChecklistItem {
+  const item = value as Record<string, unknown>;
+  return {
+    id: Number(item.id),
+    serviceOrderId: Number(valueOf(item, "ordem_servico_id", "service_order_id")),
+    description: String(valueOf(item, "descricao", "description") ?? ""),
+    required: Boolean(valueOf(item, "obrigatorio", "required")),
+    completed: Boolean(valueOf(item, "concluido", "completed")),
+    technicianNote:
+      (valueOf(item, "observacao_tecnico", "technician_note") as string | null) ??
+      null,
+    completedAt:
+      (valueOf(item, "data_conclusao_item", "item_completed_at") as string | null) ??
+      null,
+    sortOrder: Number(valueOf(item, "ordem", "sort_order") ?? 0),
+  };
+}
+
+function normalizeServiceOrder(value: unknown): ServiceOrder {
+  const order = value as Record<string, unknown>;
+  const checklist = valueOf(order, "checklist_itens", "checklist_items");
+  return {
+    id: Number(order.id),
+    code: String(valueOf(order, "codigo_os", "code") ?? ""),
+    title: String(valueOf(order, "titulo", "title") ?? ""),
+    description: String(valueOf(order, "descricao", "description") ?? ""),
+    status: String(order.status) as ServiceOrderStatus,
+    priority: String(valueOf(order, "prioridade", "priority")) as ServiceOrderPriority,
+    clientId: String(valueOf(order, "cliente_id", "client_id") ?? ""),
+    technicianId:
+      (valueOf(order, "tecnico_id", "technician_id") as string | null) ?? null,
+    createdAt: String(valueOf(order, "data_criacao", "created_at") ?? ""),
+    dueAt: (valueOf(order, "data_previsao", "due_at") as string | null) ?? null,
+    completedAt:
+      (valueOf(order, "data_conclusao", "completed_at") as string | null) ?? null,
+    statusNote:
+      (valueOf(order, "observacao_status", "status_note") as string | null) ?? null,
+    checklistItems: Array.isArray(checklist) ? checklist.map(normalizeChecklistItem) : [],
+  };
 }
 
 export function login(payload: {
   email: string;
   password: string;
 }): Promise<TokenResponse> {
-  return request<TokenResponse>("/auth/login", payload);
+  return request<TokenResponse>("/auth/login", { body: payload });
 }
 
 export function requestPasswordReset(payload: {
   email: string;
 }): Promise<MessageResponse> {
-  return request<MessageResponse>("/auth/forgot-password", payload);
+  return request<MessageResponse>("/auth/forgot-password", { body: payload });
 }
 
 export function resetPassword(payload: {
@@ -102,7 +221,86 @@ export function resetPassword(payload: {
   newPassword: string;
 }): Promise<MessageResponse> {
   return request<MessageResponse>("/auth/reset-password", {
-    token: payload.token,
-    nova_senha: payload.newPassword,
+    body: { token: payload.token, nova_senha: payload.newPassword },
   });
+}
+
+export async function getServiceOrderBoard(): Promise<
+  Record<ServiceOrderStatus, ServiceOrder[]>
+> {
+  const result = (await request<unknown>("/ordens-servico/kanban", {
+    method: "GET",
+    authenticated: true,
+  })) as Record<string, unknown>;
+  const columns = (valueOf(result, "colunas", "columns") ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const statuses: ServiceOrderStatus[] = [
+    "BACKLOG",
+    "EM_ANDAMENTO",
+    "AGUARDANDO_PECA",
+    "EM_REVISAO",
+    "CONCLUIDO",
+    "CANCELADO",
+  ];
+  return Object.fromEntries(
+    statuses.map((status) => [
+      status,
+      Array.isArray(columns[status]) ? columns[status].map(normalizeServiceOrder) : [],
+    ]),
+  ) as Record<ServiceOrderStatus, ServiceOrder[]>;
+}
+
+export async function createServiceOrder(
+  input: ServiceOrderInput,
+): Promise<ServiceOrder> {
+  const payload = {
+    titulo: input.title,
+    descricao: input.description,
+    prioridade: input.priority,
+    cliente_id: input.clientId,
+    tecnico_id: input.technicianId || null,
+    data_previsao: input.dueAt || null,
+    checklist_itens: input.checklistItems.map((item) => ({
+      descricao: item.description,
+      obrigatorio: item.required,
+      ordem: item.sortOrder,
+    })),
+  };
+  const result = await request<unknown>("/ordens-servico/", {
+    method: "POST",
+    body: payload,
+    authenticated: true,
+  });
+  return normalizeServiceOrder(result);
+}
+
+export async function updateServiceOrderStatus(
+  id: number,
+  status: ServiceOrderStatus,
+): Promise<ServiceOrder> {
+  const result = await request<unknown>(`/ordens-servico/${id}/status`, {
+    method: "PATCH",
+    body: { status },
+    authenticated: true,
+  });
+  return normalizeServiceOrder(result);
+}
+
+export async function updateChecklistItem(
+  orderId: number,
+  itemId: number,
+  changes: { completed?: boolean; technicianNote?: string },
+): Promise<ChecklistItem> {
+  const body: Record<string, unknown> = {};
+  if (changes.completed !== undefined) body.concluido = changes.completed;
+  if (changes.technicianNote !== undefined) {
+    body.observacao_tecnico = changes.technicianNote;
+  }
+  const result = await request<unknown>(
+    `/ordens-servico/${orderId}/checklist/${itemId}`,
+    { method: "PATCH", body, authenticated: true },
+  );
+  return normalizeChecklistItem(result);
 }

@@ -76,7 +76,7 @@ export function ResetPasswordForm() {
           Senha atualizada
         </h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Sua senha foi alterada. Agora você já pode entrar no ThermoMonitor.
+          Sua senha foi alterada. Agora você já pode entrar no PredictAI.
         </p>
         <Button
           type="button"

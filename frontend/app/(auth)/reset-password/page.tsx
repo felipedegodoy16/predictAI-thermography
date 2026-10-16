@@ -5,7 +5,7 @@ import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 
 export const metadata: Metadata = {
   title: "Definir nova senha",
-  description: "Crie uma nova senha para sua conta ThermoMonitor.",
+  description: "Crie uma nova senha para sua conta PredictAI.",
 };
 
 function ResetPasswordFallback() {

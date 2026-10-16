@@ -1,4 +1,4 @@
-import { Hexagon, Thermometer } from "lucide-react";
+import { Hexagon, Wrench } from "lucide-react";
 
 export function BrandLogo({
   light = false,
@@ -19,7 +19,7 @@ export function BrandLogo({
         aria-hidden="true"
       >
         <Hexagon className="absolute size-full" strokeWidth={1.8} />
-        <Thermometer
+        <Wrench
           className={compact ? "size-[18px]" : "size-6"}
           strokeWidth={1.8}
         />
@@ -30,7 +30,7 @@ export function BrandLogo({
           (compact ? "text-base" : "text-xl")
         }
       >
-        Thermo<span className={light ? "font-normal text-teal-100" : "font-normal text-slate-700"}>Monitor</span>
+        Predict<span className={light ? "font-normal text-teal-100" : "font-normal text-slate-700"}>AI</span>
       </span>
     </div>
   );

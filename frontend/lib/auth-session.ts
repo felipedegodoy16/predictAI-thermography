@@ -1,6 +1,6 @@
 import type { TokenResponse } from "@/lib/api";
 
-const SESSION_KEY = "thermomonitor.auth";
+const SESSION_KEY = "predictai.auth";
 
 export interface AuthSession extends TokenResponse {
   email: string;

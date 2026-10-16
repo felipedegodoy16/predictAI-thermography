@@ -9,7 +9,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
-    app_name: str = "Thermal Monitoring API"
+    app_name: str = "PredictAI | Gestão de Manutenção"
     app_version: str = "1.0.0"
     app_env: str = "development"
     database_url: str

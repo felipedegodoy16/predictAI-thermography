@@ -4,7 +4,7 @@ import { LoginForm } from "@/components/auth/login-form";
 
 export const metadata: Metadata = {
   title: "Entrar",
-  description: "Acesse sua conta ThermoMonitor.",
+  description: "Acesse sua conta PredictAI.",
 };
 
 export default function LoginPage() {

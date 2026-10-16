@@ -13,13 +13,13 @@ export function AuthShell({
     <main className="auth-page">
       <div className="auth-frame">
         <BrandPanel variant={variant} />
-        <section className="auth-content" aria-label="Acesso ao ThermoMonitor">
+        <section className="auth-content" aria-label="Acesso ao PredictAI">
           <div className="mb-8 flex justify-center lg:hidden">
             <BrandLogo />
           </div>
           <div className="auth-form-wrap">{children}</div>
           <footer className="mt-10 text-center text-[11px] text-slate-400">
-            © {new Date().getFullYear()} ThermoMonitor. Todos os direitos reservados.
+            © {new Date().getFullYear()} PredictAI. Todos os direitos reservados.
           </footer>
         </section>
       </div>
