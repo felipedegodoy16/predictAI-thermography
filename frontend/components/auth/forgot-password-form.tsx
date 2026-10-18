@@ -106,14 +106,14 @@ export function ForgotPasswordForm() {
               setFormError(undefined);
               reset({ email: "" });
             }}
-            className="text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-brand-primary"
+            className="text-xs font-medium text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-brand-primary"
           >
             Usar outro e-mail
           </button>
         </div>
         <Link
           href="/login"
-          className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-brand-primary hover:text-brand-primary-hover"
+          className="mt-7 inline-flex items-center gap-2 text-xs font-semibold text-brand-primary hover:text-brand-primary-hover"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
           Voltar para o login
@@ -152,7 +152,7 @@ export function ForgotPasswordForm() {
       </div>
       <Link
         href="/login"
-        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-brand-primary transition hover:border-brand-primary/50 hover:bg-teal-50/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-3 text-xs font-semibold text-brand-primary transition hover:border-brand-primary/50 hover:bg-teal-50/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
         Voltar para o login

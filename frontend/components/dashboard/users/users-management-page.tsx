@@ -121,20 +121,24 @@ export function UsersManagementPage() {
               {isAdmin ? "Administradores podem cadastrar, editar e excluir contas." : "Você pode editar apenas seu nome e e-mail."}
             </p>
           </div>
-          {isAdmin ? <button type="button" onClick={() => setCreating(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-primary px-3 text-xs font-semibold text-white hover:bg-brand-primary-hover"><Plus className="size-4" /> Novo usuário</button> : null}
-          {isAdmin ? <label className="relative block w-full sm:w-[280px]">
-            <span className="sr-only">Buscar usuário por nome ou e-mail</span>
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setOffset(0);
-              }}
-              placeholder="Buscar nome ou e-mail"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10"
-            />
-          </label> : null}
+          {isAdmin ? (
+            <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-2">
+              <label className="relative block w-full sm:w-[280px]">
+                <span className="sr-only">Buscar usuário por nome ou e-mail</span>
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setOffset(0);
+                  }}
+                  placeholder="Buscar nome ou e-mail"
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10"
+                />
+              </label>
+              <button type="button" onClick={() => setCreating(true)} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-primary px-3 text-xs font-semibold text-white hover:bg-brand-primary-hover"><Plus className="size-4" /> Novo usuário</button>
+            </div>
+          ) : null}
         </div>
 
         {error ? (

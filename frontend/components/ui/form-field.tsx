@@ -63,7 +63,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
             aria-invalid={Boolean(error)}
             aria-describedby={error ? errorId : inputProps["aria-describedby"]}
             className={
-              "min-h-11 w-full rounded-lg border bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10 disabled:bg-slate-50 " +
+              "min-h-11 w-full rounded-lg border bg-white px-3 py-2.5 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10 disabled:bg-slate-50 " +
               (Icon ? "pl-11 " : "") +
               (trailing ? "pr-12 " : "") +
               (error

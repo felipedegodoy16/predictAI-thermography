@@ -25,7 +25,7 @@ const createOrderSchema = z.object({
 type CreateOrderValues = z.infer<typeof createOrderSchema>;
 
 const inputClass =
-  "min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10";
+  "min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10";
 
 export function CreateOSModal({
   onClose,
@@ -176,8 +176,8 @@ export function CreateOSModal({
           </div>
 
           <footer className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
-            <button type="button" disabled={form.formState.isSubmitting} onClick={onClose} className="min-h-11 rounded-lg border border-slate-200 px-5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
-            <button type="submit" disabled={form.formState.isSubmitting} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-brand-primary px-5 text-sm font-semibold text-white shadow-sm hover:bg-brand-primary-hover disabled:opacity-60">
+            <button type="button" disabled={form.formState.isSubmitting} onClick={onClose} className="min-h-11 rounded-lg border border-slate-200 px-5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
+            <button type="submit" disabled={form.formState.isSubmitting} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-brand-primary px-5 text-xs font-semibold text-white shadow-sm hover:bg-brand-primary-hover disabled:opacity-60">
               {form.formState.isSubmitting ? <span className="size-4 animate-spin rounded-full border-2 border-white/35 border-t-white" /> : <Plus className="size-4" />}
               Criar ordem
             </button>

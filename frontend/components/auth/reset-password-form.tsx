@@ -105,7 +105,7 @@ export function ResetPasswordForm() {
         </p>
         <Link
           href="/forgot-password"
-          className="mt-7 inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-brand-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+          className="mt-7 inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-brand-primary px-5 py-3 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
         >
           Solicitar novo link
         </Link>
@@ -185,7 +185,7 @@ export function ResetPasswordForm() {
       </form>
       <Link
         href="/login"
-        className="mt-6 inline-flex w-full items-center justify-center gap-2 text-sm font-medium text-slate-600 hover:text-brand-primary"
+        className="mt-6 inline-flex w-full items-center justify-center gap-2 text-xs font-medium text-slate-600 hover:text-brand-primary"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
         Voltar para o login
