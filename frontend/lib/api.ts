@@ -1,4 +1,9 @@
-import { getAuthSession } from "@/lib/auth-session";
+import {
+  clearAuthSession,
+  getAuthSession,
+  saveAuthSession,
+  type AuthSession,
+} from "@/lib/auth-session";
 
 export interface TokenResponse {
   access_token: string;
@@ -18,6 +23,12 @@ export interface User {
   email: string;
   created_at: string;
   role: "user" | "admin";
+}
+
+export interface UserOption {
+  id: string;
+  name: string;
+  email: string;
 }
 
 export interface UserUpdateInput {
@@ -100,6 +111,63 @@ const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1"
 ).replace(/\/+$/, "");
 
+let refreshInFlight: Promise<AuthSession | null> | null = null;
+
+function refreshAuthSession(): Promise<AuthSession | null> {
+  if (!refreshInFlight) {
+    refreshInFlight = refreshAuthSessionOnce().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+async function refreshAuthSessionOnce(): Promise<AuthSession | null> {
+  const session = getAuthSession();
+  if (!session?.refresh_token) return null;
+
+  let response: Response;
+  try {
+    response = await fetch(API_BASE_URL + "/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiError(
+      "Não foi possível conectar à API para renovar sua sessão. Tente novamente.",
+      0,
+    );
+  }
+
+  if (response.status === 401) {
+    clearAuthSession();
+    return null;
+  }
+  if (!response.ok) {
+    throw new ApiError(
+      "Não foi possível renovar sua sessão. Tente novamente.",
+      response.status,
+    );
+  }
+
+  const tokens = (await response.json().catch(() => null)) as TokenResponse | null;
+  if (!tokens?.access_token || !tokens.refresh_token) {
+    throw new ApiError("A API retornou uma resposta de sessão inválida.", 500);
+  }
+
+  saveAuthSession(tokens, session.email);
+  return { ...tokens, email: session.email };
+}
+
+function redirectToLogin(): void {
+  clearAuthSession();
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.assign("/login");
+  }
+}
+
 function describeError(value: unknown): string {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) {
@@ -132,6 +200,7 @@ async function request<T>(
   if (options.authenticated) {
     const session = getAuthSession();
     if (!session?.access_token) {
+      redirectToLogin();
       throw new ApiError("Sua sessão expirou. Entre novamente.", 401);
     }
     headers.set("Authorization", `Bearer ${session.access_token}`);
@@ -150,6 +219,34 @@ async function request<T>(
       "Não foi possível conectar à API. Verifique se o backend está em execução.",
       0,
     );
+  }
+
+  if (options.authenticated && response.status === 401 && path !== "/auth/login") {
+    const refreshedSession = await refreshAuthSession();
+    if (!refreshedSession) {
+      redirectToLogin();
+      throw new ApiError("Sua sessão expirou. Entre novamente.", 401);
+    }
+
+    headers.set("Authorization", `Bearer ${refreshedSession.access_token}`);
+    try {
+      response = await fetch(API_BASE_URL + path, {
+        method,
+        headers,
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        cache: "no-store",
+      });
+    } catch {
+      throw new ApiError(
+        "Não foi possível conectar à API. Verifique se o backend está em execução.",
+        0,
+      );
+    }
+
+    if (response.status === 401) {
+      redirectToLogin();
+      throw new ApiError("Sua sessão expirou. Entre novamente.", 401);
+    }
   }
 
   const result: unknown =
@@ -264,6 +361,13 @@ export function listUsers(params: {
 
 export function getMyUser(): Promise<User> {
   return request<User>("/users/me", { method: "GET", authenticated: true });
+}
+
+export function listUserOptions(): Promise<UserOption[]> {
+  return request<UserOption[]>("/users/options", {
+    method: "GET",
+    authenticated: true,
+  });
 }
 
 export function createUser(payload: UserCreateInput): Promise<User> {

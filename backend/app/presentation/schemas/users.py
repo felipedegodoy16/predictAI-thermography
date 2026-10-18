@@ -54,6 +54,12 @@ class UserResponse(BaseModel):
     created_at: datetime
 
 
+class UserOptionResponse(BaseModel):
+    id: UUID
+    name: str
+    email: EmailStr
+
+
 class LoginRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 

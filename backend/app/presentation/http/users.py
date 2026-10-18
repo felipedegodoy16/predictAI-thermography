@@ -15,7 +15,12 @@ from app.presentation.http.dependencies import (
     get_user_repository,
     require_permissions,
 )
-from app.presentation.schemas.users import UserCreate, UserResponse, UserUpdate
+from app.presentation.schemas.users import (
+    UserCreate,
+    UserOptionResponse,
+    UserResponse,
+    UserUpdate,
+)
 
 router = APIRouter()
 
@@ -74,6 +79,19 @@ async def list_users(
         )
         for user in users
     ]
+
+
+@router.get(
+    "/options",
+    response_model=list[UserOptionResponse],
+    summary="List users for service order assignment",
+)
+async def list_user_options(
+    repository: Annotated[IUserRepository, Depends(get_user_repository)],
+    _: Annotated[AuthenticatedUser, Depends(get_current_user)],
+) -> list[UserOptionResponse]:
+    users = await repository.list_user_options()
+    return [UserOptionResponse(id=user.id, name=user.name, email=user.email) for user in users]
 
 
 @router.patch(

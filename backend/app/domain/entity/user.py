@@ -29,3 +29,10 @@ class User:
             created_at=datetime.now(timezone.utc),
             role=role,
         )
+
+
+@dataclass(frozen=True)
+class UserOption:
+    id: UUID
+    name: str
+    email: str

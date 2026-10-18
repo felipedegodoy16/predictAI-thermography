@@ -2,7 +2,7 @@ from typing import Protocol
 from datetime import datetime
 from uuid import UUID
 
-from app.domain.entity.user import User
+from app.domain.entity.user import User, UserOption
 
 
 class IUserRepository(Protocol):
@@ -13,6 +13,8 @@ class IUserRepository(Protocol):
     async def list_users(
         self, *, limit: int, offset: int, query: str | None = None
     ) -> list[User]: ...
+
+    async def list_user_options(self) -> list[UserOption]: ...
 
     async def update_profile(
         self, *, user_id: UUID, name: str | None, email: str | None,

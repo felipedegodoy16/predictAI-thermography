@@ -3,7 +3,7 @@ from uuid import UUID
 
 import asyncpg
 
-from app.domain.entity.user import User
+from app.domain.entity.user import User, UserOption
 from app.domain.exceptions.user import UserAlreadyExistsError
 from app.domain.repositories.user_repository import IUserRepository
 
@@ -78,6 +78,15 @@ class PostgresUserRepository(IUserRepository):
             offset,
         )
         return [self._to_entity(row) for row in rows]
+
+    async def list_user_options(self) -> list[UserOption]:
+        rows = await self._pool.fetch(
+            "SELECT id, name, email FROM users ORDER BY name, email"
+        )
+        return [
+            UserOption(id=row["id"], name=row["name"], email=row["email"])
+            for row in rows
+        ]
 
     async def update_profile(
         self, *, user_id: UUID, name: str | None, email: str | None,

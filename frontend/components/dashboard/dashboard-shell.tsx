@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { BrandLogo } from "@/components/auth/brand-logo";
+import { getMyUser } from "@/lib/api";
 import { clearAuthSession, getAuthSession } from "@/lib/auth-session";
 
 const navigation = [
@@ -30,7 +31,7 @@ const navigation = [
 export function DashboardShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [ready, setReady] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -40,20 +41,31 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       router.replace("/login");
       return;
     }
-    setEmail(session.email);
+    void getMyUser()
+      .then((user) => setName(user.name))
+      .catch(() => setName("Minha conta"));
     setReady(true);
   }, [router]);
 
   useEffect(() => setMobileOpen(false), [pathname]);
+
+  useEffect(() => {
+    function refreshProfileName() {
+      void getMyUser()
+        .then((user) => setName(user.name))
+        .catch(() => setName("Minha conta"));
+    }
+    window.addEventListener("auth-profile-updated", refreshProfileName);
+    return () => window.removeEventListener("auth-profile-updated", refreshProfileName);
+  }, []);
 
   function signOut() {
     clearAuthSession();
     router.replace("/login");
   }
 
-  const initials = email
-    .split("@")[0]
-    .split(/[._-]/)
+  const initials = name
+    .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
@@ -159,7 +171,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <div className="hidden text-xs text-slate-400 sm:block">
               Workspace <span className="mx-2 text-slate-300">/</span>
               <span className="font-medium text-slate-600">
-                {pathname === "/usuarios" ? "Usuários" : "Ordens de serviço"}
+                {pathname === "/usuarios"
+                  ? "Usuários"
+                  : pathname === "/perfil"
+                    ? "Meu perfil"
+                    : "Ordens de serviço"}
               </span>
             </div>
             <div className="sm:hidden">
@@ -176,13 +192,22 @@ export function DashboardShell({ children }: { children: ReactNode }) {
               <span className="absolute right-2 top-2 size-1.5 rounded-full bg-brand-accent" />
             </button>
             <span className="hidden h-8 w-px bg-slate-200 sm:block" />
-            <span className="flex size-9 items-center justify-center rounded-full bg-[#087c7d] text-xs font-bold text-white">
-              {initials || "PA"}
-            </span>
-            <div className="hidden min-w-0 sm:block">
-              <p className="max-w-52 truncate text-xs font-semibold text-slate-800">{email}</p>
-              <p className="text-[10px] text-slate-500">Conta da operação</p>
-            </div>
+            <Link
+              href="/perfil"
+              aria-label={`Abrir o perfil de ${name || "usuário"}`}
+              title="Meu perfil"
+              className="group flex items-center gap-2 rounded-lg px-1 py-1 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#087c7d] text-xs font-bold text-white">
+                {initials || "PA"}
+              </span>
+              <span className="hidden min-w-0 text-left sm:block">
+                <span className="block max-w-52 truncate text-xs font-semibold text-slate-800 group-hover:text-brand-primary">
+                  {name || "Minha conta"}
+                </span>
+                <span className="block text-[10px] text-slate-500">Meu perfil</span>
+              </span>
+            </Link>
             <button
               type="button"
               aria-label="Sair da conta"

@@ -25,8 +25,9 @@ Abra http://localhost:3000. Ajuste NEXT_PUBLIC_API_BASE_URL em .env.local se a A
 - /reset-password?token=...
 - /kanban (ordens de serviço)
 - /usuarios (listagem, busca e edição de nome/e-mail)
+- /perfil (consulta e edição dos próprios dados pessoais)
 
-O Kanban usa os endpoints de ordens de serviço disponíveis na API, incluindo checklist e atualização de status. No formulário de OS, cliente e técnico são vinculados pelo UUID da conta porque a API ainda não oferece catálogos para seleção de usuários ou equipamentos.
+O Kanban usa os endpoints de ordens de serviço disponíveis na API, incluindo checklist e atualização de status. No formulário de OS, cliente e técnico são selecionados a partir da lista de contas cadastradas; o catálogo de equipamentos ainda não está disponível.
 
 A tela de usuários respeita os perfis `admin` e `user`: administradores podem cadastrar contas, editar nome/e-mail/tipo e excluir outros usuários; usuários comuns podem consultar e editar apenas o próprio nome e e-mail. O backend aplica as mesmas regras e atualiza as permissões ativas após uma mudança de perfil.
 
