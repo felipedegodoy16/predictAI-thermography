@@ -10,6 +10,7 @@ import type { User, UserUpdateInput } from "@/lib/api";
 const formSchema = z.object({
   name: z.string().trim().min(2, "Informe um nome com pelo menos 2 caracteres."),
   email: z.email("Informe um endereço de e-mail válido."),
+  role: z.enum(["user", "admin"]),
 });
 
 type UserFormValues = z.infer<typeof formSchema>;
@@ -18,15 +19,17 @@ export function UserEditDrawer({
   user,
   onClose,
   onSave,
+  canChangeRole = false,
 }: {
   user: User;
   onClose: () => void;
   onSave: (value: UserUpdateInput) => Promise<void>;
+  canChangeRole?: boolean;
 }) {
   const [saveError, setSaveError] = useState<string>();
   const form = useForm<UserFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: user.name, email: user.email },
+    defaultValues: { name: user.name, email: user.email, role: user.role },
   });
 
   async function submit(values: UserFormValues) {
@@ -96,6 +99,14 @@ export function UserEditDrawer({
                 className={inputClass}
               />
             </Field>
+            {canChangeRole ? (
+              <Field label="Tipo de usuário" id="user-role">
+                <select id="user-role" {...form.register("role")} className={inputClass}>
+                  <option value="user">Usuário</option>
+                  <option value="admin">Administrador</option>
+                </select>
+              </Field>
+            ) : null}
             <Field
               label="E-mail"
               id="user-email"
@@ -115,7 +126,9 @@ export function UserEditDrawer({
               </p>
             ) : null}
             <p className="text-[11px] leading-5 text-slate-500">
-              Alterações de perfil e permissões não fazem parte deste formulário.
+              {canChangeRole
+                ? "Administradores podem alterar o tipo de usuário."
+                : "Você pode alterar apenas seus dados pessoais."}
             </p>
           </div>
 

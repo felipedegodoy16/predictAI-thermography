@@ -17,11 +17,20 @@ export interface User {
   name: string;
   email: string;
   created_at: string;
+  role: "user" | "admin";
 }
 
 export interface UserUpdateInput {
   name?: string;
   email?: string;
+  role?: "user" | "admin";
+}
+
+export interface UserCreateInput extends UserUpdateInput {
+  name: string;
+  email: string;
+  password: string;
+  role: "user" | "admin";
 }
 
 export type ServiceOrderStatus =
@@ -249,6 +258,21 @@ export function listUsers(params: {
   const suffix = query.size ? `?${query.toString()}` : "";
   return request<User[]>(`/users${suffix}`, {
     method: "GET",
+    authenticated: true,
+  });
+}
+
+export function getMyUser(): Promise<User> {
+  return request<User>("/users/me", { method: "GET", authenticated: true });
+}
+
+export function createUser(payload: UserCreateInput): Promise<User> {
+  return request<User>("/users", { body: payload, authenticated: true });
+}
+
+export function deleteUser(id: string): Promise<void> {
+  return request<void>(`/users/${encodeURIComponent(id)}`, {
+    method: "DELETE",
     authenticated: true,
   });
 }

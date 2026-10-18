@@ -1,15 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Pencil, Search, UsersRound } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { UserEditDrawer } from "@/components/dashboard/users/user-edit-drawer";
+import { UserCreateDrawer } from "@/components/dashboard/users/user-create-drawer";
 import {
   ApiError,
+  createUser,
+  deleteUser,
+  getMyUser,
   listUsers,
   updateUser,
   type User,
   type UserUpdateInput,
+  type UserCreateInput,
 } from "@/lib/api";
 
 const PAGE_SIZE = 50;
@@ -22,17 +27,23 @@ export function UsersManagementPage() {
   const [error, setError] = useState<string>();
   const [refreshKey, setRefreshKey] = useState(0);
   const [editingUser, setEditingUser] = useState<User>();
+  const [currentUser, setCurrentUser] = useState<User>();
+  const [creating, setCreating] = useState(false);
+  const isAdmin = currentUser?.role === "admin";
 
   useEffect(() => {
     let active = true;
     const timer = window.setTimeout(() => {
       setLoading(true);
       setError(undefined);
-      void listUsers({
-        limit: PAGE_SIZE,
-        offset,
-        search: query.trim() || undefined,
-      })
+      void getMyUser()
+        .then(async (me) => {
+          if (active) setCurrentUser(me);
+          if (me.role === "admin") {
+            return listUsers({ limit: PAGE_SIZE, offset, search: query.trim() || undefined });
+          }
+          return [me];
+        })
         .then((result) => {
           if (active) setUsers(result);
         })
@@ -58,10 +69,29 @@ export function UsersManagementPage() {
 
   async function saveUser(changes: UserUpdateInput) {
     if (!editingUser) return;
-    await updateUser(editingUser.id, changes);
+    await updateUser(editingUser.id, isAdmin ? changes : { name: changes.name, email: changes.email });
     toast.success("Usuário atualizado com sucesso.");
     setEditingUser(undefined);
     setRefreshKey((current) => current + 1);
+  }
+
+  async function addUser(values: UserCreateInput) {
+    await createUser(values);
+    toast.success("Usuário cadastrado com sucesso.");
+    setCreating(false);
+    setOffset(0);
+    setRefreshKey((current) => current + 1);
+  }
+
+  async function removeUser(user: User) {
+    if (!window.confirm(`Excluir o usuário ${user.name}?`)) return;
+    try {
+      await deleteUser(user.id);
+      toast.success("Usuário excluído com sucesso.");
+      setRefreshKey((current) => current + 1);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir o usuário.");
+    }
   }
 
   const firstItem = users.length ? offset + 1 : 0;
@@ -78,7 +108,7 @@ export function UsersManagementPage() {
             Usuários
           </h1>
           <p className="mt-1 max-w-xl text-sm text-slate-500">
-            Consulte as contas cadastradas e atualize nome ou e-mail.
+            {isAdmin ? "Cadastre e gerencie as contas e seus tipos de acesso." : "Consulte e atualize seus dados pessoais."}
           </p>
         </div>
       </section>
@@ -88,10 +118,11 @@ export function UsersManagementPage() {
           <div>
             <h2 className="text-sm font-semibold text-slate-800">Contas cadastradas</h2>
             <p className="mt-0.5 text-[11px] text-slate-500">
-              A gestão de permissões será disponibilizada em uma próxima etapa.
+              {isAdmin ? "Administradores podem cadastrar, editar e excluir contas." : "Você pode editar apenas seu nome e e-mail."}
             </p>
           </div>
-          <label className="relative block w-full sm:w-[280px]">
+          {isAdmin ? <button type="button" onClick={() => setCreating(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-brand-primary px-3 text-xs font-semibold text-white hover:bg-brand-primary-hover"><Plus className="size-4" /> Novo usuário</button> : null}
+          {isAdmin ? <label className="relative block w-full sm:w-[280px]">
             <span className="sr-only">Buscar usuário por nome ou e-mail</span>
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -103,7 +134,7 @@ export function UsersManagementPage() {
               placeholder="Buscar nome ou e-mail"
               className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10"
             />
-          </label>
+          </label> : null}
         </div>
 
         {error ? (
@@ -124,7 +155,7 @@ export function UsersManagementPage() {
             <thead>
               <tr className="bg-[#f4f8fa] text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3 sm:px-5">Usuário</th>
-                <th className="px-3 py-3">Data de cadastro</th>
+                <th className="px-3 py-3">Tipo / cadastro</th>
                 <th className="w-24 px-3 py-3 text-right">Ações</th>
               </tr>
             </thead>
@@ -147,6 +178,7 @@ export function UsersManagementPage() {
                     </div>
                   </td>
                   <td className="px-3 py-3 text-[11px] text-slate-500">
+                    <span className="mr-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-600">{user.role === "admin" ? "Administrador" : "Usuário"}</span>
                     {formatDate(user.created_at)}
                   </td>
                   <td className="px-3 py-3 text-right">
@@ -159,6 +191,7 @@ export function UsersManagementPage() {
                     >
                       <Pencil className="size-3.5" />
                     </button>
+                    {isAdmin && user.id !== currentUser?.id ? <button type="button" onClick={() => void removeUser(user)} aria-label={`Excluir ${user.name}`} title="Excluir usuário" className="rounded-md p-2 text-rose-600 transition hover:bg-rose-50"><Trash2 className="size-3.5" /></button> : null}
                   </td>
                 </tr>
               ))}
@@ -224,10 +257,12 @@ export function UsersManagementPage() {
       {editingUser ? (
         <UserEditDrawer
           user={editingUser}
+          canChangeRole={isAdmin}
           onClose={() => setEditingUser(undefined)}
           onSave={saveUser}
         />
       ) : null}
+      {creating ? <UserCreateDrawer onClose={() => setCreating(false)} onSave={addUser} /> : null}
     </div>
   );
 }

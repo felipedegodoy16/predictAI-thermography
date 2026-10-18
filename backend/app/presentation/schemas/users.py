@@ -1,6 +1,8 @@
 from datetime import datetime
 from uuid import UUID
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
@@ -10,6 +12,7 @@ class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     email: EmailStr
     password: str = Field(min_length=12, max_length=128)
+    role: Literal["user", "admin"] = "user"
 
     @field_validator("name")
     @classmethod
@@ -24,6 +27,7 @@ class UserUpdate(BaseModel):
 
     name: str | None = Field(default=None, min_length=2, max_length=120)
     email: EmailStr | None = None
+    role: Literal["user", "admin"] | None = None
 
     @field_validator("name")
     @classmethod
@@ -46,6 +50,7 @@ class UserResponse(BaseModel):
     id: UUID
     name: str
     email: EmailStr
+    role: Literal["user", "admin"] = "user"
     created_at: datetime
 
 

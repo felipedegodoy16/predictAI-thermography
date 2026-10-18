@@ -11,6 +11,7 @@ class User:
     password_hash: str
     created_at: datetime
     permissions: tuple[str, ...] = field(default_factory=tuple)
+    role: str = "user"
 
     @classmethod
     def create(
@@ -18,6 +19,7 @@ class User:
         name: str,
         email: str,
         password_hash: str,
+        role: str = "user",
     ) -> "User":
         return cls(
             id=uuid4(),
@@ -25,4 +27,5 @@ class User:
             email=email,
             password_hash=password_hash,
             created_at=datetime.now(timezone.utc),
+            role=role,
         )

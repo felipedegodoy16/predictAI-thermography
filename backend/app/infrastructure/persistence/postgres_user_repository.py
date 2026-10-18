@@ -16,6 +16,7 @@ class PostgresUserRepository(IUserRepository):
         row = await self._pool.fetchrow(
             """
             SELECT u.id, u.name, u.email, u.password_hash, u.created_at,
+                   COALESCE((SELECT r.code FROM user_roles ur2 JOIN roles r ON r.id = ur2.role_id WHERE ur2.user_id = u.id LIMIT 1), 'user') AS role,
                    COALESCE(
                        array_agg(DISTINCT p.code)
                            FILTER (WHERE p.code IS NOT NULL),
@@ -32,12 +33,30 @@ class PostgresUserRepository(IUserRepository):
         )
         return self._to_entity(row) if row is not None else None
 
+    async def get_by_id(self, user_id: UUID) -> User | None:
+        row = await self._pool.fetchrow(
+            """
+            SELECT u.id, u.name, u.email, u.password_hash, u.created_at,
+                   COALESCE((SELECT r.code FROM user_roles ur2 JOIN roles r ON r.id = ur2.role_id WHERE ur2.user_id = u.id LIMIT 1), 'user') AS role,
+                   COALESCE(array_agg(DISTINCT p.code) FILTER (WHERE p.code IS NOT NULL), ARRAY[]::TEXT[]) AS permissions
+            FROM users u
+            LEFT JOIN user_roles ur ON ur.user_id = u.id
+            LEFT JOIN role_permissions rp ON rp.role_id = ur.role_id
+            LEFT JOIN permissions p ON p.code = rp.permission_code
+            WHERE u.id = $1
+            GROUP BY u.id
+            """,
+            user_id,
+        )
+        return self._to_entity(row) if row is not None else None
+
     async def list_users(
         self, *, limit: int, offset: int, query: str | None = None
     ) -> list[User]:
         rows = await self._pool.fetch(
             """
             SELECT u.id, u.name, u.email, u.password_hash, u.created_at,
+                   COALESCE((SELECT r.code FROM user_roles ur2 JOIN roles r ON r.id = ur2.role_id WHERE ur2.user_id = u.id LIMIT 1), 'user') AS role,
                    COALESCE(
                        array_agg(DISTINCT p.code)
                            FILTER (WHERE p.code IS NOT NULL),
@@ -61,25 +80,43 @@ class PostgresUserRepository(IUserRepository):
         return [self._to_entity(row) for row in rows]
 
     async def update_profile(
-        self, *, user_id: UUID, name: str | None, email: str | None
+        self, *, user_id: UUID, name: str | None, email: str | None,
+        role: str | None = None,
     ) -> User | None:
         try:
-            row = await self._pool.fetchrow(
-                """
-                UPDATE users
-                SET name = COALESCE($2, name),
-                    email = COALESCE($3, email)
-                WHERE id = $1
-                RETURNING id, name, email, password_hash, created_at,
-                          ARRAY[]::TEXT[] AS permissions
-                """,
-                user_id,
-                name,
-                email,
-            )
+            async with self._pool.acquire() as connection:
+                async with connection.transaction():
+                    updated = await connection.fetchrow(
+                        "UPDATE users SET name = COALESCE($2, name), email = COALESCE($3, email) WHERE id = $1 RETURNING id",
+                        user_id, name, email,
+                    )
+                    if updated is None:
+                        return None
+                    if role is not None:
+                        await connection.execute("DELETE FROM user_roles WHERE user_id = $1", user_id)
+                        await connection.execute(
+                            "INSERT INTO user_roles (user_id, role_id) SELECT $1, id FROM roles WHERE code = $2",
+                            user_id, role,
+                        )
+                    row = await connection.fetchrow(
+                        """
+                        SELECT u.id, u.name, u.email, u.password_hash, u.created_at,
+                               COALESCE((SELECT r.code FROM user_roles ur2 JOIN roles r ON r.id = ur2.role_id WHERE ur2.user_id = u.id LIMIT 1), 'user') AS role,
+                               COALESCE(array_agg(DISTINCT p.code) FILTER (WHERE p.code IS NOT NULL), ARRAY[]::TEXT[]) AS permissions
+                        FROM users u LEFT JOIN user_roles ur ON ur.user_id = u.id
+                        LEFT JOIN role_permissions rp ON rp.role_id = ur.role_id
+                        LEFT JOIN permissions p ON p.code = rp.permission_code
+                        WHERE u.id = $1 GROUP BY u.id
+                        """,
+                        user_id,
+                    )
         except asyncpg.UniqueViolationError as error:
             raise UserAlreadyExistsError(email or "") from error
         return self._to_entity(row) if row is not None else None
+
+    async def delete(self, *, user_id: UUID) -> bool:
+        result = await self._pool.execute("DELETE FROM users WHERE id = $1", user_id)
+        return result != "DELETE 0"
 
     async def add(self, user: User) -> User:
         try:
@@ -90,21 +127,23 @@ class PostgresUserRepository(IUserRepository):
                         INSERT INTO users (id, name, email, password_hash, created_at)
                         VALUES ($1, $2, $3, $4, $5)
                         RETURNING id, name, email, password_hash, created_at,
-                                  ARRAY[]::TEXT[] AS permissions
+                                  $6::TEXT AS role, ARRAY[]::TEXT[] AS permissions
                         """,
                         user.id,
                         user.name,
                         user.email,
                         user.password_hash,
                         user.created_at,
+                        user.role,
                     )
                     await connection.execute(
                         """
                         INSERT INTO user_roles (user_id, role_id)
-                        SELECT $1, id FROM roles WHERE code = 'user'
+                        SELECT $1, id FROM roles WHERE code = $2
                         ON CONFLICT DO NOTHING
                         """,
                         user.id,
+                        user.role,
                     )
         except asyncpg.UniqueViolationError as error:
             raise UserAlreadyExistsError(user.email) from error
@@ -172,4 +211,5 @@ class PostgresUserRepository(IUserRepository):
             password_hash=row["password_hash"],
             created_at=row["created_at"],
             permissions=tuple(row["permissions"] or ()),
+            role=row["role"],
         )

@@ -14,6 +14,7 @@ class UpdateUser:
         user_id: UUID,
         name: str | None,
         email: str | None,
+        role: str | None = None,
     ) -> User | None:
         normalized_name = name.strip() if name is not None else None
         normalized_email = email.strip().casefold() if email is not None else None
@@ -21,4 +22,5 @@ class UpdateUser:
             user_id=user_id,
             name=normalized_name,
             email=normalized_email,
+            role=role,
         )

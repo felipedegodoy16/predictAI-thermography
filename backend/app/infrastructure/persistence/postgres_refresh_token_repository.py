@@ -76,6 +76,7 @@ class PostgresRefreshTokenRepository:
                 user_row = await connection.fetchrow(
                     """
                     SELECT u.id, u.name, u.email, u.password_hash, u.created_at,
+                           COALESCE((SELECT r.code FROM user_roles ur2 JOIN roles r ON r.id = ur2.role_id WHERE ur2.user_id = u.id LIMIT 1), 'user') AS role,
                            COALESCE(
                                array_agg(DISTINCT p.code)
                                    FILTER (WHERE p.code IS NOT NULL),

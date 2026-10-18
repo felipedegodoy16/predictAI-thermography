@@ -38,6 +38,7 @@ async def get_current_user(
     credentials: Annotated[
         HTTPAuthorizationCredentials | None, Depends(bearer_scheme)
     ],
+    request: Request,
 ) -> AuthenticatedUser:
     unauthorized = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -48,10 +49,15 @@ async def get_current_user(
         raise unauthorized
     try:
         claims = verify_access_token(credentials.credentials)
+        user_id = UUID(str(claims["sub"]))
+        database: Database = request.app.state.database
+        user = await PostgresUserRepository(database.get_pool()).get_by_id(user_id)
+        if user is None:
+            raise ValueError("User no longer exists")
         return AuthenticatedUser(
-            id=UUID(str(claims["sub"])),
-            email=str(claims["email"]),
-            permissions=frozenset(claims["permissions"]),
+            id=user.id,
+            email=user.email,
+            permissions=frozenset(user.permissions),
         )
     except (ValueError, KeyError, TypeError):
         raise unauthorized from None
