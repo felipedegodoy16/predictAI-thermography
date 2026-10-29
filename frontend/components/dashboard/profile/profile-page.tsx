@@ -84,29 +84,29 @@ export function ProfilePage() {
           Meu perfil
         </h1>
         <p className="mt-1 max-w-xl text-sm text-slate-500">
-          Atualize seus dados pessoais. Outras informações poderão ser incluídas aqui futuramente.
+          Consulte seus dados de acesso e atualize seu nome ou e-mail.
         </p>
       </section>
 
       {loadError ? (
-        <section role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">
+        <section role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 sm:p-5">
           <p>{loadError}</p>
           <button type="button" onClick={() => window.location.reload()} className="mt-3 font-semibold underline underline-offset-2">
             Tentar novamente
           </button>
         </section>
       ) : loading ? (
-        <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500 shadow-sm">
+        <div role="status" className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm sm:p-8">
           Carregando seu perfil…
         </div>
       ) : profile ? (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_5px_20px_rgba(15,45,54,0.04)]">
-            <header className="border-b border-slate-100 px-5 py-4 sm:px-6">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <section className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_5px_20px_rgba(15,45,54,0.04)]">
+            <header className="border-b border-slate-100 px-4 py-3.5 sm:px-6">
               <h2 className="text-sm font-semibold text-slate-800">Dados pessoais</h2>
-              <p className="mt-1 text-xs text-slate-500">Edite seu nome e e-mail de acesso.</p>
+              <p className="mt-1 text-xs text-slate-500">Nome e e-mail usados na sua conta.</p>
             </header>
-            <form onSubmit={handleSubmit(saveProfile)} className="space-y-5 p-5 sm:p-6">
+            <form onSubmit={handleSubmit(saveProfile)} className="space-y-4 p-4 sm:space-y-5 sm:p-6">
               <FormField
                 {...register("name")}
                 label="Nome completo"
@@ -132,11 +132,11 @@ export function ProfilePage() {
                   Perfil atualizado com sucesso.
                 </p>
               ) : null}
-              <div className="flex justify-end border-t border-slate-100 pt-4">
+              <div className="border-t border-slate-100 pt-4 sm:flex sm:justify-end">
                 <button
                   type="submit"
                   disabled={isSubmitting || !isDirty}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand-primary px-4 text-xs font-semibold text-white transition hover:bg-brand-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-primary px-4 text-xs font-semibold text-white transition hover:bg-brand-primary-hover disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   <Save aria-hidden="true" className="size-3.5" />
                   {isSubmitting ? "Salvando…" : "Salvar alterações"}
@@ -145,17 +145,17 @@ export function ProfilePage() {
             </form>
           </section>
 
-          <aside className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_5px_20px_rgba(15,45,54,0.04)]">
+          <aside className="space-y-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_5px_20px_rgba(15,45,54,0.04)] sm:p-5">
             <div className="flex items-center gap-3">
-              <span className="flex size-11 items-center justify-center rounded-full bg-[#e0f2f1] text-sm font-semibold text-brand-primary">
-                {getInitials(profile.name)}
+              <span role="img" aria-label={`Avatar de ${profile.name}`} className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#e0f2f1] text-brand-primary">
+                <UserRound aria-hidden="true" className="size-6" />
               </span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-800">{profile.name}</p>
                 <p className="truncate text-xs text-slate-500">{profile.email}</p>
               </div>
             </div>
-            <div className="border-t border-slate-100 pt-4">
+            <div className="space-y-4 border-t border-slate-100 pt-4">
               <InfoRow
                 icon={ShieldCheck}
                 label="Tipo de conta"
@@ -168,7 +168,7 @@ export function ProfilePage() {
               />
             </div>
             <p className="text-[11px] leading-5 text-slate-500">
-              O tipo de conta é gerenciado por um administrador e não pode ser alterado nesta tela.
+              A imagem de perfil é apenas ilustrativa por enquanto. O tipo de conta é gerenciado por um administrador.
             </p>
           </aside>
         </div>
@@ -187,7 +187,7 @@ function InfoRow({
   value: string;
 }) {
   return (
-    <div className="mb-4 flex items-start gap-2.5 last:mb-0">
+    <div className="flex items-start gap-2.5">
       <Icon aria-hidden="true" className="mt-0.5 size-4 text-slate-400" />
       <div>
         <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
@@ -195,15 +195,6 @@ function InfoRow({
       </div>
     </div>
   );
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
 }
 
 function formatDate(value: string): string {

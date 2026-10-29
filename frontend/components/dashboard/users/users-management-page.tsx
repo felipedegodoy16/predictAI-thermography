@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2, UsersRound } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { UserEditDrawer } from "@/components/dashboard/users/user-edit-drawer";
 import { UserCreateDrawer } from "@/components/dashboard/users/user-create-drawer";
@@ -98,29 +98,15 @@ export function UsersManagementPage() {
   const lastItem = offset + users.length;
 
   return (
-    <div className="space-y-5">
-      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-medium text-brand-primary-light">
-            <UsersRound className="size-4" /> Administração da plataforma
-          </div>
-          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-900 sm:text-[28px]">
-            Usuários
-          </h1>
-          <p className="mt-1 max-w-xl text-sm text-slate-500">
-            {isAdmin ? "Cadastre e gerencie as contas e seus tipos de acesso." : "Consulte e atualize seus dados pessoais."}
-          </p>
-        </div>
+    <div className="space-y-4">
+      <section>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-[28px]">
+          Usuários
+        </h1>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_5px_20px_rgba(15,45,54,0.04)]">
-        <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-800">Contas cadastradas</h2>
-            <p className="mt-0.5 text-[11px] text-slate-500">
-              {isAdmin ? "Administradores podem cadastrar, editar e excluir contas." : "Você pode editar apenas seu nome e e-mail."}
-            </p>
-          </div>
+      <section className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_5px_20px_rgba(15,45,54,0.04)]">
+        <div className="flex flex-col gap-3 border-b border-slate-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-5">
           {isAdmin ? (
             <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:gap-2">
               <label className="relative block w-full sm:w-[280px]">
@@ -154,7 +140,56 @@ export function UsersManagementPage() {
           </div>
         ) : null}
 
-        <div className="overflow-x-auto">
+        <div className="divide-y divide-slate-100 px-3 sm:hidden">
+          {users.map((user) => (
+            <article key={user.id} className="py-3">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#e0f2f1] text-[10px] font-bold text-brand-primary">
+                  {getInitials(user.name)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-slate-800">{user.name}</p>
+                  <p className="truncate text-[11px] text-slate-500">{user.email}</p>
+                </div>
+                <div className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(user)}
+                    aria-label={`Editar ${user.name}`}
+                    className="flex size-10 items-center justify-center rounded-lg text-brand-primary hover:bg-teal-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-primary"
+                  >
+                    <Pencil aria-hidden="true" className="size-4" />
+                  </button>
+                  {isAdmin && user.id !== currentUser?.id ? (
+                    <button
+                      type="button"
+                      onClick={() => void removeUser(user)}
+                      aria-label={`Excluir ${user.name}`}
+                      className="flex size-10 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-600"
+                    >
+                      <Trash2 aria-hidden="true" className="size-4" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="ml-11 mt-1.5 flex items-center gap-2 text-[10px] text-slate-500">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
+                  {user.role === "admin" ? "Administrador" : "Usuário"}
+                </span>
+                <span>{formatDate(user.created_at)}</span>
+              </div>
+            </article>
+          ))}
+          {loading ? <p role="status" className="py-8 text-center text-xs text-slate-500">Carregando usuários…</p> : null}
+          {!loading && !error && users.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-xs font-medium text-slate-700">Nenhum usuário encontrado</p>
+              {query ? <p className="mt-1 text-[11px] text-slate-500">Tente outro nome ou e-mail.</p> : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[600px] border-collapse text-left">
             <thead>
               <tr className="bg-[#f4f8fa] text-[10px] font-semibold uppercase tracking-wide text-slate-500">
@@ -226,35 +261,35 @@ export function UsersManagementPage() {
           </table>
         </div>
 
-        <footer className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 text-[10px] text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <span>
-            {users.length > 0
-              ? `Mostrando ${firstItem}–${lastItem}${users.length === PAGE_SIZE ? "+" : ""}`
-              : "Nenhum usuário nesta página"}
+        <footer className="flex items-center justify-between gap-3 border-t border-slate-100 px-3 py-2.5 text-[10px] text-slate-500 sm:px-5">
+          <span className="min-w-0 truncate">
+            {users.length > 0 ? `Mostrando ${firstItem}–${lastItem}${users.length === PAGE_SIZE ? "+" : ""}` : ""}
           </span>
-          <div className="flex items-center gap-2 self-end sm:self-auto">
-            <button
-              type="button"
-              aria-label="Página anterior"
-              disabled={loading || offset === 0}
-              onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}
-              className="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <span className="text-xs font-medium text-slate-600">
-              Página {Math.floor(offset / PAGE_SIZE) + 1}
-            </span>
-            <button
-              type="button"
-              aria-label="Próxima página"
-              disabled={loading || users.length < PAGE_SIZE}
-              onClick={() => setOffset((current) => current + PAGE_SIZE)}
-              className="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
+          {isAdmin ? (
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Página anterior"
+                disabled={loading || offset === 0}
+                onClick={() => setOffset((current) => Math.max(0, current - PAGE_SIZE))}
+                className="flex size-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <span className="text-xs font-medium text-slate-600">
+                Página {Math.floor(offset / PAGE_SIZE) + 1}
+              </span>
+              <button
+                type="button"
+                aria-label="Próxima página"
+                disabled={loading || users.length < PAGE_SIZE}
+                onClick={() => setOffset((current) => current + PAGE_SIZE)}
+                className="flex size-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+          ) : null}
         </footer>
       </section>
 

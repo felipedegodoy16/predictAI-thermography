@@ -8,3 +8,10 @@ class ServiceOrderStatus(StrEnum):
     UNDER_REVIEW = "EM_REVISAO"
     COMPLETED = "CONCLUIDO"
     CANCELLED = "CANCELADO"
+
+
+class ServiceOrderPriority(StrEnum):
+    LOW = "BAIXA"
+    MEDIUM = "MEDIA"
+    HIGH = "ALTA"
+    CRITICAL = "CRITICA"

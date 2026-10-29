@@ -1,0 +1,4 @@
+interface:
+  display_name: "Análise de Imagens Termográficas"
+  short_description: "Especifique fluxos confiáveis para dados termográficos."
+  default_prompt: "Ajude a especificar ou implementar fluxos confiáveis de análise termográfica."

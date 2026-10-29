@@ -1,0 +1,4 @@
+interface:
+  display_name: "Requisitos para Termografia"
+  short_description: "Elicite e especifique RF e RNF para termografia."
+  default_prompt: "Ajude a levantar, documentar e validar requisitos do PredictAI Thermography."

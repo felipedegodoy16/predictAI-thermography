@@ -3,15 +3,14 @@ import type { ServiceOrderPriority, ServiceOrderStatus } from "@/lib/api";
 export const SERVICE_ORDER_COLUMNS: {
   id: ServiceOrderStatus;
   label: string;
-  description: string;
   tone: string;
 }[] = [
-  { id: "BACKLOG", label: "Pendente", description: "A fazer", tone: "bg-slate-400" },
-  { id: "EM_ANDAMENTO", label: "Em andamento", description: "Em execução", tone: "bg-sky-500" },
-  { id: "AGUARDANDO_PECA", label: "Aguardando peças", description: "Pausada", tone: "bg-amber-500" },
-  { id: "EM_REVISAO", label: "Em revisão", description: "Validação", tone: "bg-violet-500" },
-  { id: "CONCLUIDO", label: "Concluídas", description: "Finalizadas", tone: "bg-emerald-500" },
-  { id: "CANCELADO", label: "Canceladas", description: "Encerradas", tone: "bg-rose-400" },
+  { id: "BACKLOG", label: "Pendente", tone: "bg-slate-400" },
+  { id: "EM_ANDAMENTO", label: "Em andamento", tone: "bg-sky-500" },
+  { id: "AGUARDANDO_PECA", label: "Aguardando peças", tone: "bg-amber-500" },
+  { id: "EM_REVISAO", label: "Em revisão", tone: "bg-violet-500" },
+  { id: "CONCLUIDO", label: "Concluídas", tone: "bg-emerald-500" },
+  { id: "CANCELADO", label: "Canceladas", tone: "bg-rose-400" },
 ];
 
 export const PRIORITIES: {

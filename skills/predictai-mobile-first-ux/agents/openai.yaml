@@ -1,0 +1,4 @@
+interface:
+  display_name: "UX/UI Mobile First - PredictAI"
+  short_description: "Crie interfaces mobile first, claras e sem elementos sem funcao."
+  default_prompt: "Revise ou desenhe esta interface priorizando a tarefa do usuario e a utilidade de cada elemento."

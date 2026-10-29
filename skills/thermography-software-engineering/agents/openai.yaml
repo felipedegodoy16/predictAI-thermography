@@ -1,0 +1,4 @@
+interface:
+  display_name: "Engenharia de Software para Termografia"
+  short_description: "Evolua o PredictAI alinhado à arquitetura existente."
+  default_prompt: "Analise o repositório e evolua o software alinhado ao contexto técnico."

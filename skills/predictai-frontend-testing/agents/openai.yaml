@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Testing - PredictAI"
+  short_description: "Valide fluxos de interface e comportamento mobile no frontend."
+  default_prompt: "Valide o fluxo de usuario no frontend PredictAI e reporte resultados reproduziveis."

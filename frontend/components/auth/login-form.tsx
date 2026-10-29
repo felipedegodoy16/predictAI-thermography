@@ -50,7 +50,7 @@ export function LoginForm() {
         window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
       }
       toast.success("Acesso realizado com sucesso.");
-      router.replace("/kanban");
+      router.replace("/dashboard");
     } catch (error) {
       setFormError(
         error instanceof ApiError

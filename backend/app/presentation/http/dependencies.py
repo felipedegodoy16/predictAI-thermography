@@ -22,6 +22,12 @@ from app.infrastructure.persistence.postgres_refresh_token_repository import (
 from app.infrastructure.persistence.postgres_service_order_repository import (
     PostgresServiceOrderRepository,
 )
+from app.infrastructure.persistence.postgres_equipment_repository import (
+    PostgresEquipmentRepository,
+)
+from app.infrastructure.persistence.postgres_dashboard_repository import (
+    PostgresDashboardRepository,
+)
 from app.infrastructure.security.argon2_password_hasher import Argon2PasswordHasher
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -102,6 +108,18 @@ def get_service_order_repository(
     return PostgresServiceOrderRepository(pool)
 
 
+def get_equipment_repository(
+    pool: Annotated[asyncpg.Pool, Depends(get_pool)],
+) -> PostgresEquipmentRepository:
+    return PostgresEquipmentRepository(pool)
+
+
+def get_dashboard_repository(
+    pool: Annotated[asyncpg.Pool, Depends(get_pool)],
+) -> PostgresDashboardRepository:
+    return PostgresDashboardRepository(pool)
+
+
 def get_password_hasher() -> PasswordHasher:
     return Argon2PasswordHasher()
 
@@ -133,6 +151,8 @@ __all__ = [
     "get_update_user_use_case",
     "get_current_user",
     "get_service_order_repository",
+    "get_equipment_repository",
+    "get_dashboard_repository",
     "get_refresh_token_repository",
     "require_permissions",
 ]

@@ -5,14 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Activity,
-  Bell,
-  Boxes,
+  ChartNoAxesCombined,
   ClipboardList,
-  LayoutDashboard,
   LogOut,
   Menu,
-  Settings2,
   UsersRound,
+  Wrench,
   X,
 } from "lucide-react";
 import { BrandLogo } from "@/components/auth/brand-logo";
@@ -20,12 +18,10 @@ import { getMyUser } from "@/lib/api";
 import { clearAuthSession, getAuthSession } from "@/lib/auth-session";
 
 const navigation = [
-  { label: "Início", href: null, icon: LayoutDashboard },
-  { label: "Equipamentos", href: null, icon: Boxes },
+  { label: "Dashboard", href: "/dashboard", icon: ChartNoAxesCombined },
   { label: "Ordens de serviço", href: "/kanban", icon: ClipboardList },
+  { label: "Equipamentos", href: "/equipamentos", icon: Wrench },
   { label: "Usuários", href: "/usuarios", icon: UsersRound },
-  { label: "Relatórios", href: null, icon: Activity },
-  { label: "Configurações", href: null, icon: Settings2 },
 ];
 
 export function DashboardShell({ children }: { children: ReactNode }) {
@@ -107,59 +103,41 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             <X className="size-5" />
           </button>
         </div>
-        <nav aria-label="Navegação principal" className="mt-9 space-y-1.5">
+        <nav aria-label="Navegação principal" className="mt-6 space-y-1.5">
           {navigation.map(({ label, href, icon: Icon }) => {
-            const active = href !== null && pathname === href;
+            const active = pathname === href || pathname.startsWith(`${href}/`);
             const content = (
               <>
                 <Icon aria-hidden="true" className="size-[18px] shrink-0" />
                 <span className="flex-1">{label}</span>
-                {href === null ? (
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] text-teal-100">
-                    Em breve
-                  </span>
-                ) : null}
               </>
             );
             const className =
               "flex min-h-11 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition " +
               (active
                 ? "bg-[#087c7d] text-white shadow-sm"
-                : href
-                  ? "text-teal-100 hover:bg-white/10 hover:text-white"
-                  : "cursor-not-allowed text-teal-100/70");
+                : "text-teal-100 hover:bg-white/10 hover:text-white");
 
-            return href ? (
+            return (
               <Link key={label} href={href} aria-current={active ? "page" : undefined} className={className}>
                 {content}
               </Link>
-            ) : (
-              <span key={label} aria-disabled="true" className={className}>
-                {content}
-              </span>
             );
           })}
         </nav>
-        <div className="mt-auto rounded-xl border border-teal-300/30 bg-[#075d61]/60 p-4">
-          <div className="mb-3 flex size-9 items-center justify-center rounded-lg border border-teal-200/30 bg-teal-200/10 text-teal-200">
-            <Activity className="size-[18px]" />
-          </div>
-          <p className="text-xs font-semibold leading-5 text-white">
-            Manutenção em um só lugar
+        <section aria-label="Sobre a gestão de manutenção" className="mt-auto rounded-xl border border-teal-300/25 bg-[#075d61]/55 p-3.5">
+          <span className="mb-2.5 flex size-8 items-center justify-center rounded-lg border border-teal-200/25 bg-teal-200/10 text-teal-200">
+            <Activity aria-hidden="true" className="size-4" />
+          </span>
+          <h2 className="text-xs font-semibold text-white">Manutenção em um só lugar</h2>
+          <p className="mt-1 text-[11px] leading-4 text-teal-100/80">
+            Organize atividades corretivas, preventivas e preditivas da operação.
           </p>
-          <p className="mt-1 text-[11px] leading-4 text-teal-100/75">
-            Corretiva, preventiva e preditiva para sua operação.
-          </p>
-          <div className="mt-4 flex gap-1.5" aria-hidden="true">
-            <span className="h-1 w-8 rounded-full bg-teal-300" />
-            <span className="h-1 w-5 rounded-full bg-teal-300/55" />
-            <span className="h-1 w-3 rounded-full bg-teal-300/30" />
-          </div>
-        </div>
+        </section>
       </aside>
 
       <div className="min-h-screen lg:pl-[264px]">
-        <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-md sm:px-7">
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-slate-200/80 bg-white/90 px-3 backdrop-blur-md sm:h-16 sm:px-7">
           <div className="flex items-center gap-3">
             <button
               className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
@@ -168,30 +146,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             >
               <Menu className="size-5" />
             </button>
-            <div className="hidden text-xs text-slate-400 sm:block">
-              Workspace <span className="mx-2 text-slate-300">/</span>
-              <span className="font-medium text-slate-600">
-                {pathname === "/usuarios"
-                  ? "Usuários"
-                  : pathname === "/perfil"
-                    ? "Meu perfil"
-                    : "Ordens de serviço"}
-              </span>
-            </div>
-            <div className="sm:hidden">
+            <div className="lg:hidden">
               <BrandLogo compact />
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <button
-              type="button"
-              aria-label="Notificações"
-              className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100"
-            >
-              <Bell className="size-[18px]" />
-              <span className="absolute right-2 top-2 size-1.5 rounded-full bg-brand-accent" />
-            </button>
-            <span className="hidden h-8 w-px bg-slate-200 sm:block" />
             <Link
               href="/perfil"
               aria-label={`Abrir o perfil de ${name || "usuário"}`}
@@ -219,7 +178,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             </button>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1680px] px-4 py-5 sm:px-7 sm:py-7">
+        <main className="mx-auto w-full max-w-[1680px] px-3 py-3 sm:px-7 sm:py-6">
           {children}
         </main>
       </div>

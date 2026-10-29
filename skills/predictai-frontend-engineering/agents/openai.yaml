@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Engineering - PredictAI"
+  short_description: "Implemente no Next.js, React, TypeScript e Tailwind existentes."
+  default_prompt: "Implemente esta tarefa no frontend existente, seguindo o stack, componentes e contratos da API."

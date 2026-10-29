@@ -1,0 +1,91 @@
+# Requisitos funcionais e não funcionais — PredictAI Thermography
+
+**Versão:** 0.1 — rascunho para validação do PO/equipe  
+**Data:** 28/10/2026  
+**Status:** proposta baseada nos documentos e no código disponíveis; ainda não aprovada como baseline.
+
+## 1. Objetivo e escopo
+
+Este documento registra os comportamentos já identificáveis no sistema e os requisitos-alvo descritos no Termo de Abertura do Projeto (TAP). Ele serve como base para validação: itens já presentes no código estão marcados como **Observado no código**; itens derivados do objetivo do projeto estão marcados como **Proposta do TAP** e não devem ser tratados como funcionalidade entregue.
+
+O sistema tem como objetivo apoiar o monitoramento térmico de equipamentos industriais, integrando captura/comunicação, API, persistência, interface e análise automatizada. O repositório implementa atualmente autenticação, gestão de usuários e ordens de serviço com quadro Kanban e checklist. Não foram encontrados fluxos de imagem térmica, equipamento, medição, análise de anomalia ou alerta no código consultado.
+
+## 2. Atores identificados
+
+| Ator | Papel no escopo atual/alvo | Estado |
+|---|---|---|
+| Usuário autenticado | Acessa as áreas protegidas; consulta/atualiza o próprio perfil e trabalha com ordens de serviço. | Observado no código |
+| Administrador | Gerencia contas e seus papéis de acesso. | Observado no código |
+| Técnico | Poderá executar inspeções e ser associado a uma ordem de serviço. O modelo atual não possui papel técnico separado. | Proposta; confirmar distinção de papéis |
+| Dispositivo de captura/placa de comunicação | Envia imagens e medições térmicas ao sistema. | Proposta do TAP; hardware/protocolo pendentes |
+| Responsável técnico | Avalia resultados e recomendações; a IA deve apoiar, não substituir, sua avaliação. | Princípio registrado no TAP; fluxo de aprovação pendente |
+
+> **Termo “cliente”:** no código atual, `cliente_id` referencia um usuário cadastrado e as opções de cliente/técnico vêm da lista de usuários. Não existe catálogo próprio de empresas/clientes nem regra que diferencie esses cadastros. Validar se este comportamento atende ao domínio.
+
+## 3. Requisitos funcionais
+
+| ID | Requisito | Estado e evidência | Critério de aceite / observação |
+|---|---|---|---|
+| RF-001 | O sistema deve autenticar um usuário por e-mail e senha e, quando as credenciais forem válidas, iniciar uma sessão com token de acesso e token de renovação. | Observado no código: `POST /api/v1/auth/login`. | Credenciais válidas retornam os tokens e seus prazos; credenciais inválidas não autenticam o usuário. |
+| RF-002 | O sistema deve renovar a sessão usando um token de renovação válido e rejeitar tokens inválidos, expirados ou já utilizados. | Observado no código: `POST /api/v1/auth/refresh`, rotação no repositório. | Token válido é rotacionado; token inválido/expirado recebe resposta não autorizada. |
+| RF-003 | O sistema deve permitir solicitar redefinição de senha por e-mail e alterar a senha com token válido e não expirado. | Observado no código: `POST /forgot-password` e `POST /reset-password`. | A resposta da solicitação não revela se o e-mail existe; token inválido/expirado não altera a senha. A entrega de e-mail depende da configuração operacional. |
+| RF-004 | O sistema deve permitir ao administrador cadastrar, listar, pesquisar, editar e excluir contas de usuário, inclusive atribuir o papel `user` ou `admin`. | Observado no código: `/api/v1/users` e tela `/usuarios`. | Listagem aceita busca e paginação; um administrador não pode excluir a própria conta; conta vinculada a OS não é excluída e gera conflito. |
+| RF-005 | O sistema deve permitir que o usuário consulte e atualize o próprio nome e e-mail; somente administrador pode alterar o papel de acesso. | Observado no código: `GET /users/me`, `PATCH /users/{id}` e tela `/perfil`. | Usuário comum não altera outros usuários nem o próprio papel; tentativa sem campos para atualizar é rejeitada. |
+| RF-006 | O sistema deve permitir criar uma ordem de serviço com título, descrição, prioridade, cliente, técnico opcional, previsão opcional e itens iniciais de checklist. | Observado no código: `POST /api/v1/ordens-servico/` e formulário do Kanban. | A API valida campos e referências; atribui código e estado inicial conforme o banco. Confirmar se o estado inicial e o formato do código são regras aprovadas do produto. |
+| RF-007 | O sistema deve listar ordens de serviço e permitir filtrar por estado, técnico e prioridade, além de paginação. | Observado no código: `GET /api/v1/ordens-servico/`. | Resultados respeitam filtros; limite da página é de 1 a 100; deslocamento não pode ser negativo. |
+| RF-008 | O sistema deve apresentar o quadro Kanban com as ordens agrupadas por estado e permitir consultar os detalhes de uma ordem. | Observado no código: `GET /kanban`, `GET /{id}` e tela `/kanban`. | Cada ordem aparece na coluna correspondente; detalhes incluem dados da OS e checklist ordenado. |
+| RF-009 | O sistema deve permitir atualizar dados gerais de uma ordem de serviço existente. | Observado na API: `PUT /{id}`. | Apenas campos aceitos pela API são atualizados; ordem inexistente retorna não encontrado. Confirmar quais campos devem estar editáveis na interface. |
+| RF-010 | O sistema deve permitir adicionar, editar, concluir e remover itens do checklist de uma ordem, mantendo descrição, obrigatoriedade, ordem, observação técnica e data de conclusão quando aplicável. | Observado na API: rotas `/checklist`; criação também é aceita junto à OS. | Concluir um item registra data/hora; reabrir remove essa data; progresso exibido corresponde aos itens concluídos. Confirmar quais operações ficarão disponíveis na interface. |
+| RF-011 | O sistema deve permitir alterar o estado de uma ordem e registrar justificativa/observação quando informada. | Observado no código: `PATCH /{id}/status`. | Ao concluir, a API impede a mudança enquanto houver item obrigatório pendente; ao concluir, registra data de conclusão. A matriz de transições permitidas ainda precisa ser definida. |
+| RF-012 | O sistema deve receber de um dispositivo de captura ou integração as imagens térmicas e medições associadas a uma inspeção. | Proposta do TAP; não encontrado no código atual. | Definir hardware, protocolo, autenticação do dispositivo, formatos, tamanho máximo, campos obrigatórios e tratamento de reenvio/duplicidade antes da implementação. |
+| RF-013 | O sistema deve registrar uma inspeção associada ao equipamento monitorado, com data/hora de captura e vínculo às imagens e medições recebidas. | Proposta do TAP; não há entidade/equipamento/inspeção no código atual. | Definir cadastro/identificador do equipamento, fuso horário, autoria/origem da captura e política para metadados ausentes. |
+| RF-014 | O sistema deve apresentar a imagem térmica e as medições disponíveis para uma inspeção, distinguindo dados radiométricos de uma imagem colorizada. | Proposta do TAP; não encontrado no código atual. | Se os dados radiométricos/calibração não estiverem disponíveis, a interface não deve apresentar temperatura absoluta derivada somente das cores da imagem. |
+| RF-015 | O sistema deve armazenar e permitir consultar o histórico de inspeções e medições por equipamento. | Proposta do TAP; não encontrado no código atual. | Definir filtros, ordenação, retenção e permissões; comparações devem indicar diferenças nas condições de captura quando conhecidas. |
+| RF-016 | O sistema deve analisar imagens/dados térmicos para indicar possíveis padrões ou anomalias e apresentar o resultado como apoio à avaliação técnica. | Proposta do TAP; não encontrado no código atual. | Definir método, dados de validação, explicação do resultado, métricas aceitáveis e mecanismo de revisão humana. Não classificar criticidade sem regra validada. |
+| RF-017 | O sistema deve gerar alertas quando uma regra de anomalia aprovada for satisfeita. | Proposta do TAP; não encontrado no código atual. | Definir regra/limiar, destinatários, canal, severidade, deduplicação, confirmação e tratamento de falso positivo antes de implementar. |
+
+## 4. Requisitos não funcionais
+
+| ID | Requisito | Estado e evidência | Critério de aceite / decisão pendente |
+|---|---|---|---|
+| RNF-001 | Operações protegidas devem exigir autenticação válida; operações administrativas devem verificar permissão no backend, independentemente da interface. | Implementado em parte relevante da API com Bearer token e permissões `users:read`/`users:write`. | Requisições sem token válido recebem 401; sem permissão suficiente recebem 403. Revisar autorização das operações de OS, que atualmente exigem usuário autenticado sem granularidade adicional. |
+| RNF-002 | Senhas não devem ser armazenadas em texto simples e devem obedecer à política mínima/máxima atualmente definida. | Código usa Argon2; cadastro e redefinição exigem 12 a 128 caracteres. | Persistência contém hash verificável, nunca senha original; entradas fora dos limites são rejeitadas. Confirmar se a política deve incluir regras adicionais. |
+| RNF-003 | Endpoints de listagem devem limitar o tamanho da resposta e validar os parâmetros de paginação/busca. | Implementado na listagem de usuários e OS. | Usuários: `limit` entre 1 e 100, `offset` não negativo, busca até 120 caracteres; OS: `limit` entre 1 e 100, `skip` não negativo. |
+| RNF-004 | Entradas de API devem ser validadas por esquema e erros de validação devem ser retornados sem persistir dados inválidos. | Implementado com modelos Pydantic; frontend também valida formulários com Zod. | Formatos e limites definidos nos esquemas são aplicados; erro informa a falha sem expor credenciais ou segredos. |
+| RNF-005 | O backend deve manter separação entre regras de domínio, casos de uso, infraestrutura e camada HTTP, preservando o contrato de API versionado existente quando mudanças forem compatíveis. | Estrutura observada em `backend/app`; API sob `/api/v1`. | Novas regras de negócio não ficam acopladas a componentes de transporte/persistência sem justificativa; alterações incompatíveis exigem decisão de versionamento. |
+| RNF-006 | Operações que gravam uma OS e seus itens iniciais de checklist devem preservar consistência transacional. | Implementado no repositório PostgreSQL para criação e atualização de estado. | Se uma parte da gravação falhar, a operação não deve deixar OS parcialmente criada ou estado parcialmente atualizado. Confirmar escopo transacional para todas as operações de checklist. |
+| RNF-007 | Toda medição térmica quantitativa deve manter vínculo à captura original, aos parâmetros de aquisição/calibração disponíveis, à unidade e ao processo que gerou o resultado. | Proposta de qualidade para os fluxos do TAP; não implementado. | Resultado deve ser rastreável e reproduzível dentro das informações disponíveis; definir campos obrigatórios por câmera/formato antes do desenvolvimento. |
+| RNF-008 | O sistema não deve apresentar como temperatura absoluta um valor inferido apenas pela paleta de cores de uma imagem RGB/colorizada. | Requisito de integridade da análise; fluxo térmico ainda não implementado. | Em teste com imagem sem matriz radiométrica/calibração, sistema sinaliza a limitação e não exibe medição absoluta calculada pelas cores. |
+| RNF-009 | O processamento deve informar falhas causadas por arquivo inválido, formato não suportado, metadados insuficientes ou erro de processamento sem descartar silenciosamente a origem. | Proposta; fluxo de imagem ainda não implementado. | Usuário recebe estado/erro identificável; original e metadados válidos permanecem associados quando a operação falhar. Formatos suportados ainda precisam ser escolhidos. |
+| RNF-010 | Resultados de análise automatizada devem apresentar limitações e não podem substituir a aprovação/avaliação do responsável técnico. | Premissa declarada no TAP; fluxo ainda não implementado. | Resultado é identificado como sugestão automatizada, com evidências/limitações disponíveis; definir mecanismo de revisão e registro de aceite. |
+| RNF-011 | A interface deve oferecer uso responsivo para as telas e dispositivos definidos para o projeto, incluindo o cenário de inspeção em campo se confirmado. | Proposta; a interface existente usa layouts responsivos, mas dispositivos-alvo e critérios não foram definidos. | Validar em uma matriz de viewport/dispositivos aprovada; definir suporte a toque, condições de luminosidade, luvas e acessibilidade aplicável. |
+| RNF-012 | A sessão e os dados de inspeção devem ter controles de confidencialidade e retenção compatíveis com o risco e com o contexto do cliente. | Pendente de validação. O README registra que tokens ficam em `sessionStorage` e menciona cookies HttpOnly como possível evolução. | Definir modelo de ameaça, política de retenção/eliminação, backups, controle de acesso às imagens e armazenamento dos tokens antes de produção. |
+| RNF-013 | O sistema deve atender metas mensuráveis de desempenho e capacidade para upload, consulta histórica e análise térmica. | Pendente: TAP não define metas numéricas e não há fluxo de imagens implementado. | PO/equipe devem definir tamanho de imagem, carga concorrente, percentis de latência e ambiente de medição; estabelecer metas após caracterizar hardware e volume esperado. |
+| RNF-014 | O sistema deve ter metas de disponibilidade, recuperação e backup adequadas ao uso industrial pretendido. | Pendente: não há SLA, RPO/RTO ou política de backup aprovados nos artefatos consultados. | Definir disponibilidade alvo, frequência/retenção de backup e tempos máximos de recuperação após esclarecer ambiente de implantação e criticidade operacional. |
+
+## 5. Decisões necessárias para fechar a especificação
+
+1. O escopo desta entrega inclui o protótipo de captura/hardware ou somente a plataforma/API e processamento de imagens existentes/fornecidas?
+2. “Cliente” e “técnico” são tipos distintos de pessoa/empresa? Quais papéis e permissões cada um terá?
+3. Qual câmera/sensor será usado, quais formatos fornece e quais dados radiométricos/metadados estão acessíveis?
+4. Quais parâmetros de medição serão obrigatórios ou opcionais (por exemplo, emissividade, temperatura refletida, distância e condições atmosféricas) e como tratar valores ausentes?
+5. O que define uma anomalia e sua severidade? Quais dados de referência e aprovação técnica validarão a análise/IA?
+6. Quais canais, destinatários e regras serão usados para alertas? Quais estados/transições de OS são permitidos e qual justificativa é obrigatória?
+7. Quais são as metas de desempenho, formatos/tamanhos aceitos, plataformas suportadas, disponibilidade, retenção, backup, privacidade e segurança para implantação?
+8. A aplicação precisa funcionar offline? Se sim, quais operações, por quanto tempo e como resolver conflitos na sincronização?
+
+## 6. Fontes consultadas
+
+- `TAP_PredictAI_Thermography.docx` — objetivo, escopo-alvo, premissas e riscos do projeto.
+- `frontend/README.md` — rotas existentes, limitações do catálogo de equipamentos e armazenamento atual de sessão.
+- `backend/app/presentation/http/` e `backend/app/presentation/schemas/` — contratos de autenticação, usuários e ordens de serviço.
+- `backend/app/infrastructure/persistence/` e `backend/app/domain/entity/` — persistência e estados observados para usuários/ordens/checklists.
+- `frontend/app/`, `frontend/components/` e `frontend/lib/api.ts` — telas e integração atualmente implementadas.
+- Skills do projeto: `skills/thermography-requirements/`, `skills/thermography-software-engineering/` e `skills/thermography-image-analysis/`.
+
+## 7. Aprovação
+
+| Responsável | Decisão | Data | Observações |
+|---|---|---|---|
+| Product Owner / representante do negócio | Pendente | — | Validar escopo, atores, prioridade e regras de negócio. |
+| Equipe técnica | Pendente | — | Validar viabilidade, integrações, metas e critérios técnicos. |

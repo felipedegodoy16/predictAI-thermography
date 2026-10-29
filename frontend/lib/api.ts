@@ -97,6 +97,75 @@ export interface ServiceOrderInput {
   checklistItems: ChecklistItemInput[];
 }
 
+export type EquipmentType =
+  | "MOTOR_ELETRICO"
+  | "BOMBA"
+  | "PAINEL_ELETRICO"
+  | "COMPRESSOR"
+  | "OUTRO";
+
+export type EquipmentCriticality = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
+
+export interface EquipmentFieldOption {
+  key: string;
+  label: string;
+  unit: string;
+}
+
+export interface EquipmentTypeOption {
+  equipmentType: EquipmentType;
+  label: string;
+  fields: EquipmentFieldOption[];
+}
+
+export interface Equipment {
+  id: number;
+  code: string;
+  name: string;
+  equipmentType: EquipmentType;
+  manufacturer: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  assetTag: string | null;
+  location: string | null;
+  criticality: EquipmentCriticality;
+  installationDate: string | null;
+  notes: string | null;
+  specifications: Record<string, number>;
+  createdAt: string;
+}
+
+export interface EquipmentInput {
+  name: string;
+  equipmentType: EquipmentType;
+  manufacturer?: string;
+  model?: string;
+  serialNumber?: string;
+  assetTag?: string;
+  location?: string;
+  criticality: EquipmentCriticality;
+  installationDate?: string;
+  notes?: string;
+  specifications: Record<string, number>;
+}
+
+export interface DashboardMonthActivity {
+  month: string;
+  opened: number;
+  completed: number;
+}
+
+export interface DashboardSummary {
+  openOrders: number;
+  closedOrders: number;
+  completedOrders: number;
+  cancelledOrders: number;
+  overdueOrders: number;
+  byStatus: Record<ServiceOrderStatus, number>;
+  byPriority: Record<ServiceOrderPriority, number>;
+  monthlyActivity: DashboardMonthActivity[];
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -470,4 +539,123 @@ export async function updateChecklistItem(
     { method: "PATCH", body, authenticated: true },
   );
   return normalizeChecklistItem(result);
+}
+
+function normalizeEquipment(value: unknown): Equipment {
+  const equipment = value as Record<string, unknown>;
+  const specifications = valueOf(equipment, "especificacoes", "specifications");
+  return {
+    id: Number(equipment.id),
+    code: String(valueOf(equipment, "codigo", "code") ?? ""),
+    name: String(valueOf(equipment, "nome", "name") ?? ""),
+    equipmentType: String(valueOf(equipment, "tipo", "equipment_type")) as EquipmentType,
+    manufacturer: (valueOf(equipment, "fabricante", "manufacturer") as string | null) ?? null,
+    model: (valueOf(equipment, "modelo", "model") as string | null) ?? null,
+    serialNumber: (valueOf(equipment, "numero_serie", "serial_number") as string | null) ?? null,
+    assetTag: (valueOf(equipment, "patrimonio", "asset_tag") as string | null) ?? null,
+    location: (valueOf(equipment, "localizacao", "location") as string | null) ?? null,
+    criticality: String(valueOf(equipment, "criticidade", "criticality")) as EquipmentCriticality,
+    installationDate: (valueOf(equipment, "data_instalacao", "installation_date") as string | null) ?? null,
+    notes: (valueOf(equipment, "observacoes", "notes") as string | null) ?? null,
+    specifications: specifications && typeof specifications === "object"
+      ? Object.fromEntries(Object.entries(specifications).map(([key, item]) => [key, Number(item)]))
+      : {},
+    createdAt: String(valueOf(equipment, "data_cadastro", "created_at") ?? ""),
+  };
+}
+
+export async function getEquipmentTypes(): Promise<EquipmentTypeOption[]> {
+  const result = await request<unknown[]>("/equipamentos/tipos", {
+    method: "GET",
+    authenticated: true,
+  });
+  return result.map((value) => {
+    const option = value as Record<string, unknown>;
+    const fields = valueOf(option, "campos", "fields");
+    return {
+      equipmentType: String(valueOf(option, "tipo", "equipment_type")) as EquipmentType,
+      label: String(option.label ?? ""),
+      fields: Array.isArray(fields)
+        ? fields.map((field) => {
+            const item = field as Record<string, unknown>;
+            return {
+              key: String(item.key ?? ""),
+              label: String(item.label ?? ""),
+              unit: String(item.unit ?? ""),
+            };
+          })
+        : [],
+    };
+  });
+}
+
+export async function listEquipments(params: {
+  equipmentType?: EquipmentType;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<Equipment[]> {
+  const query = new URLSearchParams();
+  if (params.equipmentType) query.set("tipo", params.equipmentType);
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.offset !== undefined) query.set("offset", String(params.offset));
+  const suffix = query.size ? `?${query.toString()}` : "";
+  const result = await request<unknown[]>(`/equipamentos${suffix}`, {
+    method: "GET",
+    authenticated: true,
+  });
+  return result.map(normalizeEquipment);
+}
+
+export async function createEquipment(input: EquipmentInput): Promise<Equipment> {
+  const result = await request<unknown>("/equipamentos", {
+    body: {
+      nome: input.name,
+      tipo: input.equipmentType,
+      fabricante: input.manufacturer || null,
+      modelo: input.model || null,
+      numero_serie: input.serialNumber || null,
+      patrimonio: input.assetTag || null,
+      localizacao: input.location || null,
+      criticidade: input.criticality,
+      data_instalacao: input.installationDate || null,
+      observacoes: input.notes || null,
+      especificacoes: input.specifications,
+    },
+    authenticated: true,
+  });
+  return normalizeEquipment(result);
+}
+
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  const result = await request<unknown>("/dashboard/resumo", {
+    method: "GET",
+    authenticated: true,
+  });
+  const summary = result as Record<string, unknown>;
+  const rawStatuses = valueOf(summary, "por_status", "by_status") as Record<string, unknown>;
+  const rawPriorities = valueOf(summary, "por_prioridade", "by_priority") as Record<string, unknown>;
+  const rawMonths = valueOf(summary, "atividade_mensal", "monthly_activity");
+  const statuses: ServiceOrderStatus[] = [
+    "BACKLOG", "EM_ANDAMENTO", "AGUARDANDO_PECA", "EM_REVISAO", "CONCLUIDO", "CANCELADO",
+  ];
+  const priorities: ServiceOrderPriority[] = ["BAIXA", "MEDIA", "ALTA", "CRITICA"];
+  return {
+    openOrders: Number(valueOf(summary, "os_abertas", "open_orders") ?? 0),
+    closedOrders: Number(valueOf(summary, "os_fechadas", "closed_orders") ?? 0),
+    completedOrders: Number(valueOf(summary, "os_concluidas", "completed_orders") ?? 0),
+    cancelledOrders: Number(valueOf(summary, "os_canceladas", "cancelled_orders") ?? 0),
+    overdueOrders: Number(valueOf(summary, "os_atrasadas", "overdue_orders") ?? 0),
+    byStatus: Object.fromEntries(statuses.map((status) => [status, Number(rawStatuses?.[status] ?? 0)])) as Record<ServiceOrderStatus, number>,
+    byPriority: Object.fromEntries(priorities.map((priority) => [priority, Number(rawPriorities?.[priority] ?? 0)])) as Record<ServiceOrderPriority, number>,
+    monthlyActivity: Array.isArray(rawMonths)
+      ? rawMonths.map((month) => {
+          const item = month as Record<string, unknown>;
+          return {
+            month: String(valueOf(item, "mes", "month") ?? ""),
+            opened: Number(valueOf(item, "abertas", "opened") ?? 0),
+            completed: Number(valueOf(item, "concluidas", "completed") ?? 0),
+          };
+        })
+      : [],
+  };
 }

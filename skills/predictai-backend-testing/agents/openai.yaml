@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Testing - PredictAI"
+  short_description: "Teste regras de dominio e contratos da API FastAPI."
+  default_prompt: "Planeje ou implemente testes para o backend PredictAI, verificando comportamentos observaveis."
