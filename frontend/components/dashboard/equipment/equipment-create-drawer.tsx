@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { FileUp, X } from "lucide-react";
 import { createEquipment, type EquipmentCriticality, type EquipmentInput, type EquipmentTypeOption } from "@/lib/api";
 
 const inputClass = "min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10";
@@ -19,6 +19,7 @@ export function EquipmentCreateDrawer({
   const [specifications, setSpecifications] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [manual, setManual] = useState<File>();
 
   const selectedType = types.find((type) => type.equipmentType === equipmentType);
 
@@ -46,7 +47,7 @@ export function EquipmentCreateDrawer({
     };
 
     try {
-      await createEquipment(input);
+      await createEquipment(input, manual);
       await onCreated();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Não foi possível cadastrar o equipamento.");
@@ -140,6 +141,17 @@ export function EquipmentCreateDrawer({
             <Field label="Observações">
               <textarea name="notes" rows={3} maxLength={2000} className={`${inputClass} resize-y py-2.5`} />
             </Field>
+            <div>
+              <label htmlFor="equipment-manual" className="mb-1.5 block text-xs font-medium text-slate-700">Manual do equipamento (PDF, até 25 MB)</label>
+              <label htmlFor="equipment-manual" className="flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-slate-300 px-3 py-2.5 hover:border-brand-primary hover:bg-teal-50/40">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-brand-primary"><FileUp aria-hidden="true" className="size-4" /></span>
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-medium text-slate-700">{manual?.name ?? "Selecionar arquivo PDF"}</span>
+                  <span className="mt-0.5 block text-[11px] text-slate-500">A orientação da IA lê o texto do PDF; prefira um manual pesquisável.</span>
+                </span>
+                <input id="equipment-manual" type="file" accept="application/pdf,.pdf" className="sr-only" onChange={(event) => setManual(event.target.files?.[0])} />
+              </label>
+            </div>
             {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-800">{error}</p> : null}
           </div>
 

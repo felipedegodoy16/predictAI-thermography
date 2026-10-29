@@ -23,12 +23,12 @@ class PostgresServiceOrderRepository:
             row = await conn.fetchrow(
                 """INSERT INTO service_orders
                    (id, code, title, description, priority, client_id,
-                    technician_id, due_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    technician_id, due_at, equipment_id)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                    RETURNING *""",
                 service_order_id, code, payload["title"], payload["description"],
                 payload["priority"], payload["client_id"], payload.get("technician_id"),
-                payload.get("due_at"),
+                payload.get("due_at"), payload.get("equipment_id"),
             )
             await self._insert_items(conn, service_order_id, payload.get("checklist_items", []))
             return await self._get_with_connection(conn, row)

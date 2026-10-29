@@ -19,8 +19,9 @@ class PostgresEquipmentRepository:
                 """INSERT INTO equipment
                    (id, code, name, equipment_type, manufacturer, model,
                     serial_number, asset_tag, location, criticality,
-                    installation_date, notes, specifications)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
+                    installation_date, notes, specifications, manual_file_name)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                           $13::jsonb, $14)
                    RETURNING *""",
                 equipment_id,
                 code,
@@ -35,8 +36,15 @@ class PostgresEquipmentRepository:
                 payload.get("installation_date"),
                 payload.get("notes"),
                 json.dumps(payload.get("specifications", {})),
+                payload.get("manual_file_name"),
             )
             return self._to_dict(row)
+
+    async def get(self, equipment_id: int) -> dict[str, Any] | None:
+        row = await self._pool.fetchrow(
+            "SELECT * FROM equipment WHERE id = $1", equipment_id
+        )
+        return self._to_dict(row) if row else None
 
     async def list(
         self, *, limit: int, offset: int, equipment_type: str | None = None

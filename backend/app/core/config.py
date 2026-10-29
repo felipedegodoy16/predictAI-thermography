@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     emails_from_email: str = ""
     emails_from_name: str = "Suporte Manutenção"
     frontend_url: str = "http://localhost:3000/reset-password"
+    groq_api_key: SecretStr = SecretStr("")
+    groq_model: str = "openai/gpt-oss-20b"
 
     @property
     def database_dsn(self) -> str:

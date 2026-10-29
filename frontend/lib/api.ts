@@ -73,6 +73,7 @@ export interface ServiceOrder {
   status: ServiceOrderStatus;
   priority: ServiceOrderPriority;
   clientId: string;
+  equipmentId: number | null;
   technicianId: string | null;
   createdAt: string;
   dueAt: string | null;
@@ -92,8 +93,16 @@ export interface ServiceOrderInput {
   description: string;
   priority: ServiceOrderPriority;
   clientId: string;
+  equipmentId?: number;
   technicianId?: string;
   dueAt?: string;
+  checklistItems: ChecklistItemInput[];
+}
+
+export interface EquipmentAdvice {
+  title: string;
+  description: string;
+  priority: ServiceOrderPriority;
   checklistItems: ChecklistItemInput[];
 }
 
@@ -133,6 +142,7 @@ export interface Equipment {
   notes: string | null;
   specifications: Record<string, number>;
   createdAt: string;
+  manualFileName: string | null;
 }
 
 export interface EquipmentInput {
@@ -265,7 +275,8 @@ async function request<T>(
 ): Promise<T> {
   const method = options.method ?? "POST";
   const headers = new Headers();
-  if (options.body !== undefined) headers.set("Content-Type", "application/json");
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  if (options.body !== undefined && !isFormData) headers.set("Content-Type", "application/json");
   if (options.authenticated) {
     const session = getAuthSession();
     if (!session?.access_token) {
@@ -280,7 +291,7 @@ async function request<T>(
     response = await fetch(API_BASE_URL + path, {
       method,
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.body === undefined ? undefined : isFormData ? options.body as FormData : JSON.stringify(options.body),
       cache: "no-store",
     });
   } catch {
@@ -302,7 +313,7 @@ async function request<T>(
       response = await fetch(API_BASE_URL + path, {
         method,
         headers,
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        body: options.body === undefined ? undefined : isFormData ? options.body as FormData : JSON.stringify(options.body),
         cache: "no-store",
       });
     } catch {
@@ -378,6 +389,7 @@ function normalizeServiceOrder(value: unknown): ServiceOrder {
     status: String(order.status) as ServiceOrderStatus,
     priority: String(valueOf(order, "prioridade", "priority")) as ServiceOrderPriority,
     clientId: String(valueOf(order, "cliente_id", "client_id") ?? ""),
+    equipmentId: (valueOf(order, "equipamento_id", "equipment_id") as number | null) ?? null,
     technicianId:
       (valueOf(order, "tecnico_id", "technician_id") as string | null) ?? null,
     createdAt: String(valueOf(order, "data_criacao", "created_at") ?? ""),
@@ -496,6 +508,7 @@ export async function createServiceOrder(
     descricao: input.description,
     prioridade: input.priority,
     cliente_id: input.clientId,
+    equipamento_id: input.equipmentId ?? null,
     tecnico_id: input.technicianId || null,
     data_previsao: input.dueAt || null,
     checklist_itens: input.checklistItems.map((item) => ({
@@ -561,6 +574,7 @@ function normalizeEquipment(value: unknown): Equipment {
       ? Object.fromEntries(Object.entries(specifications).map(([key, item]) => [key, Number(item)]))
       : {},
     createdAt: String(valueOf(equipment, "data_cadastro", "created_at") ?? ""),
+    manualFileName: (valueOf(equipment, "manual_nome_arquivo", "manual_file_name") as string | null) ?? null,
   };
 }
 
@@ -606,9 +620,9 @@ export async function listEquipments(params: {
   return result.map(normalizeEquipment);
 }
 
-export async function createEquipment(input: EquipmentInput): Promise<Equipment> {
-  const result = await request<unknown>("/equipamentos", {
-    body: {
+export async function createEquipment(input: EquipmentInput, manual?: File): Promise<Equipment> {
+  const formData = new FormData();
+  formData.set("payload", JSON.stringify({
       nome: input.name,
       tipo: input.equipmentType,
       fabricante: input.manufacturer || null,
@@ -620,10 +634,79 @@ export async function createEquipment(input: EquipmentInput): Promise<Equipment>
       data_instalacao: input.installationDate || null,
       observacoes: input.notes || null,
       especificacoes: input.specifications,
-    },
+  }));
+  if (manual) formData.set("manual", manual);
+  const result = await request<unknown>("/equipamentos", {
+    body: formData,
     authenticated: true,
   });
   return normalizeEquipment(result);
+}
+
+export async function getEquipmentAdvice(equipmentId: number, problem: string): Promise<EquipmentAdvice> {
+  const result = await request<unknown>(`/equipamentos/${equipmentId}/orientacao`, {
+    body: { problema: problem },
+    authenticated: true,
+  });
+  const advice = result as Record<string, unknown>;
+  const checklist = valueOf(advice, "checklist_itens", "checklist");
+  return {
+    title: String(valueOf(advice, "titulo", "title") ?? ""),
+    description: String(valueOf(advice, "descricao", "description") ?? ""),
+    priority: String(valueOf(advice, "prioridade", "priority") ?? "MEDIA") as ServiceOrderPriority,
+    checklistItems: Array.isArray(checklist)
+      ? checklist.map((value, index) => {
+          const item = value as Record<string, unknown>;
+          return {
+            description: String(valueOf(item, "descricao", "description") ?? ""),
+            required: Boolean(valueOf(item, "obrigatorio", "required") ?? true),
+            sortOrder: index,
+          };
+        })
+      : [],
+  };
+}
+
+export async function getEquipmentManual(equipmentId: number): Promise<Blob> {
+  const path = `/equipamentos/${equipmentId}/manual`;
+  let session = getAuthSession();
+  if (!session?.access_token) {
+    redirectToLogin();
+    throw new ApiError("Sua sessão expirou. Entre novamente.", 401);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(API_BASE_URL + path, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiError("Não foi possível conectar à API para carregar o manual.", 0);
+  }
+
+  if (response.status === 401) {
+    const refreshedSession = await refreshAuthSession();
+    if (!refreshedSession) {
+      redirectToLogin();
+      throw new ApiError("Sua sessão expirou. Entre novamente.", 401);
+    }
+    session = refreshedSession;
+    try {
+      response = await fetch(API_BASE_URL + path, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: "no-store",
+      });
+    } catch {
+      throw new ApiError("Não foi possível conectar à API para carregar o manual.", 0);
+    }
+  }
+
+  if (!response.ok) {
+    const result = await response.json().catch(() => null) as { detail?: unknown } | null;
+    throw new ApiError(describeError(result?.detail), response.status);
+  }
+  return response.blob();
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {

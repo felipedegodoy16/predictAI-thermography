@@ -53,6 +53,7 @@ class ServiceOrderCreate(BaseModel):
     description: Annotated[str, Field(min_length=1)] = Field(alias="descricao")
     priority: ServiceOrderPriority = Field(alias="prioridade")
     client_id: UUID = Field(alias="cliente_id")
+    equipment_id: int | None = Field(default=None, alias="equipamento_id")
     technician_id: UUID | None = Field(default=None, alias="tecnico_id")
     due_at: datetime | None = Field(default=None, alias="data_previsao")
     checklist_items: list[ChecklistItemCreate] = Field(default_factory=list, alias="checklist_itens")
@@ -90,6 +91,7 @@ class ServiceOrderResponse(BaseModel):
     status: ServiceOrderStatus
     priority: str = Field(alias="prioridade")
     client_id: UUID = Field(alias="cliente_id")
+    equipment_id: int | None = Field(default=None, alias="equipamento_id")
     technician_id: UUID | None = Field(alias="tecnico_id")
     created_at: datetime = Field(alias="data_criacao")
     due_at: datetime | None = Field(alias="data_previsao")

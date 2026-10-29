@@ -1,5 +1,8 @@
 # Ambiente virtual
 .venv/
+frontend/tsconfig.tsbuildinfo
+backend/manual/*
+!backend/manual/.gitkeep
 
 # Variáveis de ambiente
 .env

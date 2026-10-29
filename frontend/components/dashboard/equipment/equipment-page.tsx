@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Plus, Search, Wrench } from "lucide-react";
+import { Eye, Plus, Search, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { EquipmentCreateDrawer } from "@/components/dashboard/equipment/equipment-create-drawer";
+import { EquipmentDetailDrawer } from "@/components/dashboard/equipment/equipment-detail-drawer";
 import {
   getEquipmentTypes,
   listEquipments,
@@ -34,6 +35,7 @@ export function EquipmentPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [detailEquipment, setDetailEquipment] = useState<Equipment | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -136,7 +138,7 @@ export function EquipmentPage() {
         ) : filteredEquipment.length ? (
           <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3">
             {filteredEquipment.map((item) => (
-              <EquipmentCard key={item.id} equipment={item} types={types} />
+              <EquipmentCard key={item.id} equipment={item} types={types} onDetails={() => setDetailEquipment(item)} />
             ))}
           </div>
         ) : equipment.length ? (
@@ -165,11 +167,14 @@ export function EquipmentPage() {
           onCreated={handleCreated}
         />
       ) : null}
+      {detailEquipment ? (
+        <EquipmentDetailDrawer equipment={detailEquipment} types={types} onClose={() => setDetailEquipment(null)} />
+      ) : null}
     </div>
   );
 }
 
-function EquipmentCard({ equipment, types }: { equipment: Equipment; types: EquipmentTypeOption[] }) {
+function EquipmentCard({ equipment, types, onDetails }: { equipment: Equipment; types: EquipmentTypeOption[]; onDetails: () => void }) {
   const type = types.find((option) => option.equipmentType === equipment.equipmentType);
   const specifications = type?.fields.filter((field) => equipment.specifications[field.key]) ?? [];
 
@@ -186,6 +191,7 @@ function EquipmentCard({ equipment, types }: { equipment: Equipment; types: Equi
         </span>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[11px]">
+        {equipment.manualFileName ? <EquipmentFact label="Manual" value={equipment.manualFileName} /> : null}
         {equipment.assetTag ? <EquipmentFact label="Patrimônio" value={equipment.assetTag} /> : null}
         {equipment.location ? <EquipmentFact label="Local" value={equipment.location} /> : null}
         {equipment.manufacturer || equipment.model ? <EquipmentFact label="Fabricante / modelo" value={[equipment.manufacturer, equipment.model].filter(Boolean).join(" · ")} /> : null}
@@ -193,6 +199,9 @@ function EquipmentCard({ equipment, types }: { equipment: Equipment; types: Equi
           <EquipmentFact key={field.key} label={field.label} value={`${equipment.specifications[field.key]} ${field.unit}`} />
         ))}
       </dl>
+      <button type="button" onClick={onDetails} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-primary/30 hover:bg-teal-50 hover:text-brand-primary">
+        <Eye aria-hidden="true" className="size-3.5" /> Ver detalhes
+      </button>
     </article>
   );
 }

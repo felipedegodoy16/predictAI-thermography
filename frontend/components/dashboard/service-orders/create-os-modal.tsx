@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
-import { Plus, RefreshCw, Trash2, X } from "lucide-react";
-import { listUserOptions, type ServiceOrderInput, type UserOption } from "@/lib/api";
+import { FileText, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
+import { getEquipmentAdvice, listEquipments, listUserOptions, type Equipment, type ServiceOrderInput, type UserOption } from "@/lib/api";
 import { PRIORITIES } from "./constants";
 
 const checklistSchema = z.object({
@@ -18,6 +18,7 @@ const createOrderSchema = z.object({
   description: z.string().trim().min(1, "Descreva o serviço."),
   priority: z.enum(["BAIXA", "MEDIA", "ALTA", "CRITICA"]),
   clientId: z.string().uuid("Selecione o cliente da ordem."),
+  equipmentId: z.string(),
   technicianId: z.union([z.literal(""), z.string().uuid("Selecione um técnico válido.")]),
   dueAt: z.string(),
   checklistItems: z.array(checklistSchema),
@@ -39,6 +40,13 @@ export function CreateOSModal({
   const [usersLoading, setUsersLoading] = useState(true);
   const [usersError, setUsersError] = useState<string>();
   const [usersReloadKey, setUsersReloadKey] = useState(0);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [equipmentLoadError, setEquipmentLoadError] = useState("");
+  const [problem, setProblem] = useState("");
+  const [adviceApplied, setAdviceApplied] = useState(false);
+  const [adviceChecklistCount, setAdviceChecklistCount] = useState(0);
+  const [adviceLoading, setAdviceLoading] = useState(false);
+  const [adviceError, setAdviceError] = useState("");
   const form = useForm<CreateOrderValues>({
     resolver: zodResolver(createOrderSchema),
     defaultValues: {
@@ -46,15 +54,17 @@ export function CreateOSModal({
       description: "",
       priority: "MEDIA",
       clientId: "",
+      equipmentId: "",
       technicianId: "",
       dueAt: "",
       checklistItems: [{ description: "", required: true }],
     },
   });
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: "checklistItems",
   });
+  const equipmentSelect = form.register("equipmentId");
 
   useEffect(() => {
     let active = true;
@@ -77,12 +87,46 @@ export function CreateOSModal({
     };
   }, [usersReloadKey]);
 
+  useEffect(() => {
+    let active = true;
+    void listEquipments({ limit: 100 })
+      .then((rows) => { if (active) setEquipment(rows); })
+      .catch((error: unknown) => {
+        if (active) setEquipmentLoadError(error instanceof Error ? error.message : "Não foi possível carregar os equipamentos.");
+      });
+    return () => { active = false; };
+  }, []);
+
+  const selectedEquipment = equipment.find((item) => String(item.id) === form.watch("equipmentId"));
+
+  async function requestAdvice() {
+    if (!selectedEquipment || !problem.trim()) return;
+    setAdviceLoading(true);
+    setAdviceError("");
+    setAdviceApplied(false);
+    setAdviceChecklistCount(0);
+    try {
+      const suggestion = await getEquipmentAdvice(selectedEquipment.id, problem.trim());
+      setAdviceApplied(true);
+      setAdviceChecklistCount(suggestion.checklistItems.length);
+      form.setValue("title", suggestion.title, { shouldDirty: true, shouldValidate: true });
+      form.setValue("description", suggestion.description, { shouldDirty: true, shouldValidate: true });
+      form.setValue("priority", suggestion.priority, { shouldDirty: true, shouldValidate: true });
+      replace(suggestion.checklistItems);
+    } catch (error) {
+      setAdviceError(error instanceof Error ? error.message : "Não foi possível consultar a IA.");
+    } finally {
+      setAdviceLoading(false);
+    }
+  }
+
   async function submit(values: CreateOrderValues) {
     await onCreate({
       title: values.title,
       description: values.description,
       priority: values.priority,
       clientId: values.clientId,
+      equipmentId: values.equipmentId ? Number(values.equipmentId) : undefined,
       technicianId: values.technicianId || undefined,
       dueAt: values.dueAt ? new Date(values.dueAt).toISOString() : undefined,
       checklistItems: values.checklistItems
@@ -121,6 +165,38 @@ export function CreateOSModal({
 
         <form onSubmit={form.handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col">
           <div className="space-y-5 overflow-y-auto px-5 py-5 sm:px-7">
+            <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <FileText aria-hidden="true" className="size-4 text-brand-primary" />
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-800">Equipamento e orientação</h3>
+                  <p className="mt-0.5 text-[11px] text-slate-500">Vincule um equipamento ou descreva o problema para consultar o manual com IA.</p>
+                </div>
+              </div>
+              <label htmlFor="os-equipment" className="mb-1.5 block text-[11px] font-medium text-slate-600">Equipamento (opcional)</label>
+              <select id="os-equipment" {...equipmentSelect} onChange={(event) => { equipmentSelect.onChange(event); setAdviceApplied(false); setAdviceChecklistCount(0); }} className={inputClass}>
+                <option value="">Sem equipamento vinculado</option>
+                {equipment.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name}{item.manualFileName ? " · manual disponível" : ""}</option>)}
+              </select>
+              {equipmentLoadError ? <p role="alert" className="mt-1 text-[11px] text-rose-600">{equipmentLoadError}</p> : null}
+              {selectedEquipment?.manualFileName ? (
+                <div className="mt-3 space-y-2.5">
+                  <label htmlFor="os-problem" className="block text-[11px] font-medium text-slate-600">Problema observado</label>
+                  <textarea id="os-problem" value={problem} onChange={(event) => { setProblem(event.target.value); setAdviceApplied(false); setAdviceChecklistCount(0); }} rows={2} maxLength={4000} placeholder="Ex.: o motor está vibrando e aquecendo acima do normal." className={inputClass + " resize-y"} />
+                  <button type="button" onClick={() => void requestAdvice()} disabled={adviceLoading || problem.trim().length < 5} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-brand-primary/20 bg-white px-3 text-xs font-semibold text-brand-primary hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50">
+                    {adviceLoading ? <span className="size-3.5 animate-spin rounded-full border-2 border-brand-primary/25 border-t-brand-primary" /> : <Sparkles aria-hidden="true" className="size-3.5" />}
+                    {adviceLoading ? "Consultando manual…" : "Consultar manual com IA"}
+                  </button>
+                  <p className="text-[10px] leading-4 text-slate-500">Orientação baseada no manual e no relato; revise com um profissional antes de executar.</p>
+                  {adviceError ? <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-700">{adviceError}</p> : null}
+                  {adviceApplied ? <div role="status" className="rounded-lg border border-teal-100 bg-white p-3 text-xs leading-5 text-slate-700">
+                    <p className="font-semibold text-brand-primary">Rascunho da OS preenchido para validação.</p>
+                    <p className="mt-1">Revise o título, a descrição, a prioridade e as {adviceChecklistCount} etapas do checklist antes de criar a ordem.</p>
+                  </div> : null}
+                </div>
+              ) : selectedEquipment ? <p className="mt-2 text-[11px] text-slate-500">Este equipamento não tem manual PDF. Você ainda pode abrir a OS manualmente.</p> : null}
+            </section>
+
             <div>
               <label htmlFor="os-title" className="mb-1.5 block text-xs font-semibold text-slate-700">Título da atividade</label>
               <input id="os-title" autoFocus placeholder="Ex.: Inspeção preventiva da bomba principal" {...form.register("title")} className={inputClass} />

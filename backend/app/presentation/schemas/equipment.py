@@ -89,4 +89,5 @@ class EquipmentResponse(BaseModel):
     installation_date: date | None = Field(alias="data_instalacao")
     notes: str | None = Field(alias="observacoes")
     specifications: dict[str, float] = Field(alias="especificacoes")
+    manual_file_name: str | None = Field(alias="manual_nome_arquivo")
     created_at: datetime = Field(alias="data_cadastro")
