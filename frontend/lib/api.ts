@@ -115,16 +115,9 @@ export type EquipmentType =
 
 export type EquipmentCriticality = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
 
-export interface EquipmentFieldOption {
-  key: string;
-  label: string;
-  unit: string;
-}
-
 export interface EquipmentTypeOption {
   equipmentType: EquipmentType;
   label: string;
-  fields: EquipmentFieldOption[];
 }
 
 export interface Equipment {
@@ -133,6 +126,8 @@ export interface Equipment {
   name: string;
   equipmentType: EquipmentType;
   manufacturer: string | null;
+  yellowLimitC: number | null;
+  redLimitC: number | null;
   model: string | null;
   serialNumber: string | null;
   assetTag: string | null;
@@ -140,15 +135,16 @@ export interface Equipment {
   criticality: EquipmentCriticality;
   installationDate: string | null;
   notes: string | null;
-  specifications: Record<string, number>;
   createdAt: string;
   manualFileName: string | null;
 }
 
 export interface EquipmentInput {
-  name: string;
+  name?: string;
   equipmentType: EquipmentType;
-  manufacturer?: string;
+  manufacturer: string;
+  yellowLimitC: number;
+  redLimitC: number;
   model?: string;
   serialNumber?: string;
   assetTag?: string;
@@ -156,7 +152,6 @@ export interface EquipmentInput {
   criticality: EquipmentCriticality;
   installationDate?: string;
   notes?: string;
-  specifications: Record<string, number>;
 }
 
 export interface DashboardMonthActivity {
@@ -556,13 +551,16 @@ export async function updateChecklistItem(
 
 function normalizeEquipment(value: unknown): Equipment {
   const equipment = value as Record<string, unknown>;
-  const specifications = valueOf(equipment, "especificacoes", "specifications");
   return {
     id: Number(equipment.id),
     code: String(valueOf(equipment, "codigo", "code") ?? ""),
     name: String(valueOf(equipment, "nome", "name") ?? ""),
     equipmentType: String(valueOf(equipment, "tipo", "equipment_type")) as EquipmentType,
     manufacturer: (valueOf(equipment, "fabricante", "manufacturer") as string | null) ?? null,
+    yellowLimitC: valueOf(equipment, "limite_amarelo_c", "yellow_limit_c") == null
+      ? null : Number(valueOf(equipment, "limite_amarelo_c", "yellow_limit_c")),
+    redLimitC: valueOf(equipment, "limite_vermelho_c", "red_limit_c") == null
+      ? null : Number(valueOf(equipment, "limite_vermelho_c", "red_limit_c")),
     model: (valueOf(equipment, "modelo", "model") as string | null) ?? null,
     serialNumber: (valueOf(equipment, "numero_serie", "serial_number") as string | null) ?? null,
     assetTag: (valueOf(equipment, "patrimonio", "asset_tag") as string | null) ?? null,
@@ -570,9 +568,6 @@ function normalizeEquipment(value: unknown): Equipment {
     criticality: String(valueOf(equipment, "criticidade", "criticality")) as EquipmentCriticality,
     installationDate: (valueOf(equipment, "data_instalacao", "installation_date") as string | null) ?? null,
     notes: (valueOf(equipment, "observacoes", "notes") as string | null) ?? null,
-    specifications: specifications && typeof specifications === "object"
-      ? Object.fromEntries(Object.entries(specifications).map(([key, item]) => [key, Number(item)]))
-      : {},
     createdAt: String(valueOf(equipment, "data_cadastro", "created_at") ?? ""),
     manualFileName: (valueOf(equipment, "manual_nome_arquivo", "manual_file_name") as string | null) ?? null,
   };
@@ -585,20 +580,9 @@ export async function getEquipmentTypes(): Promise<EquipmentTypeOption[]> {
   });
   return result.map((value) => {
     const option = value as Record<string, unknown>;
-    const fields = valueOf(option, "campos", "fields");
     return {
       equipmentType: String(valueOf(option, "tipo", "equipment_type")) as EquipmentType,
       label: String(option.label ?? ""),
-      fields: Array.isArray(fields)
-        ? fields.map((field) => {
-            const item = field as Record<string, unknown>;
-            return {
-              key: String(item.key ?? ""),
-              label: String(item.label ?? ""),
-              unit: String(item.unit ?? ""),
-            };
-          })
-        : [],
     };
   });
 }
@@ -623,9 +607,11 @@ export async function listEquipments(params: {
 export async function createEquipment(input: EquipmentInput, manual?: File): Promise<Equipment> {
   const formData = new FormData();
   formData.set("payload", JSON.stringify({
-      nome: input.name,
+      nome: input.name || "",
       tipo: input.equipmentType,
-      fabricante: input.manufacturer || null,
+      fabricante: input.manufacturer,
+      limite_amarelo_c: input.yellowLimitC,
+      limite_vermelho_c: input.redLimitC,
       modelo: input.model || null,
       numero_serie: input.serialNumber || null,
       patrimonio: input.assetTag || null,
@@ -633,7 +619,6 @@ export async function createEquipment(input: EquipmentInput, manual?: File): Pro
       criticidade: input.criticality,
       data_instalacao: input.installationDate || null,
       observacoes: input.notes || null,
-      especificacoes: input.specifications,
   }));
   if (manual) formData.set("manual", manual);
   const result = await request<unknown>("/equipamentos", {

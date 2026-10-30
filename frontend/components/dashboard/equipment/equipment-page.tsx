@@ -84,7 +84,7 @@ export function EquipmentPage() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-[28px]">Equipamentos</h1>
-          <p className="mt-1 text-xs text-slate-500 sm:text-sm">Dados técnicos dos ativos para contextualizar as análises termográficas.</p>
+          <p className="mt-1 text-xs text-slate-500 sm:text-sm">Fabricante, tipo e limites de temperatura para acompanhamento termográfico.</p>
         </div>
         <button
           type="button"
@@ -176,8 +176,6 @@ export function EquipmentPage() {
 
 function EquipmentCard({ equipment, types, onDetails }: { equipment: Equipment; types: EquipmentTypeOption[]; onDetails: () => void }) {
   const type = types.find((option) => option.equipmentType === equipment.equipmentType);
-  const specifications = type?.fields.filter((field) => equipment.specifications[field.key]) ?? [];
-
   return (
     <article className="min-w-0 rounded-xl border border-slate-200 p-3.5 sm:p-4">
       <div className="flex items-start justify-between gap-3">
@@ -191,13 +189,12 @@ function EquipmentCard({ equipment, types, onDetails }: { equipment: Equipment; 
         </span>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[11px]">
+        {equipment.yellowLimitC !== null ? <EquipmentFact label="Alerta" value={`${equipment.yellowLimitC.toLocaleString("pt-BR")} °C`} /> : null}
+        {equipment.redLimitC !== null ? <EquipmentFact label="OS urgente" value={`${equipment.redLimitC.toLocaleString("pt-BR")} °C`} /> : null}
         {equipment.manualFileName ? <EquipmentFact label="Manual" value={equipment.manualFileName} /> : null}
         {equipment.assetTag ? <EquipmentFact label="Patrimônio" value={equipment.assetTag} /> : null}
         {equipment.location ? <EquipmentFact label="Local" value={equipment.location} /> : null}
         {equipment.manufacturer || equipment.model ? <EquipmentFact label="Fabricante / modelo" value={[equipment.manufacturer, equipment.model].filter(Boolean).join(" · ")} /> : null}
-        {specifications.map((field) => (
-          <EquipmentFact key={field.key} label={field.label} value={`${equipment.specifications[field.key]} ${field.unit}`} />
-        ))}
       </dl>
       <button type="button" onClick={onDetails} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-primary/30 hover:bg-teal-50 hover:text-brand-primary">
         <Eye aria-hidden="true" className="size-3.5" /> Ver detalhes

@@ -9,16 +9,9 @@ from app.domain.entity.equipment import EQUIPMENT_TYPE_OPTIONS, EquipmentType
 EquipmentCriticality = Literal["BAIXA", "MEDIA", "ALTA", "CRITICA"]
 
 
-class EquipmentFieldOption(BaseModel):
-    key: str
-    label: str
-    unit: str
-
-
 class EquipmentTypeOption(BaseModel):
     equipment_type: EquipmentType = Field(alias="tipo")
     label: str
-    fields: list[EquipmentFieldOption] = Field(alias="campos")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -28,7 +21,6 @@ def equipment_type_options() -> list[EquipmentTypeOption]:
         EquipmentTypeOption(
             equipment_type=equipment_type,
             label=configuration["label"],
-            fields=configuration["fields"],
         )
         for equipment_type, configuration in EQUIPMENT_TYPE_OPTIONS.items()
     ]
@@ -41,9 +33,11 @@ class EquipmentCreate(BaseModel):
         extra="forbid",
     )
 
-    name: Annotated[str, Field(min_length=2, max_length=200)] = Field(alias="nome")
+    name: Annotated[str, Field(max_length=200)] = Field(default="", alias="nome")
     equipment_type: EquipmentType = Field(alias="tipo")
-    manufacturer: str | None = Field(default=None, max_length=120, alias="fabricante")
+    manufacturer: Annotated[str, Field(min_length=1, max_length=120)] = Field(alias="fabricante")
+    yellow_limit_c: float = Field(alias="limite_amarelo_c", allow_inf_nan=False)
+    red_limit_c: float = Field(alias="limite_vermelho_c", allow_inf_nan=False)
     model: str | None = Field(default=None, max_length=120, alias="modelo")
     serial_number: str | None = Field(default=None, max_length=120, alias="numero_serie")
     asset_tag: str | None = Field(default=None, max_length=80, alias="patrimonio")
@@ -51,25 +45,15 @@ class EquipmentCreate(BaseModel):
     criticality: EquipmentCriticality = Field(default="MEDIA", alias="criticidade")
     installation_date: date | None = Field(default=None, alias="data_instalacao")
     notes: str | None = Field(default=None, max_length=2000, alias="observacoes")
-    specifications: dict[str, float] = Field(default_factory=dict, alias="especificacoes")
 
     @model_validator(mode="after")
-    def validate_specifications(self) -> "EquipmentCreate":
-        allowed = {
-            field["key"]
-            for field in EQUIPMENT_TYPE_OPTIONS[self.equipment_type]["fields"]
-        }
-        unsupported = set(self.specifications) - allowed
-        if unsupported:
-            raise ValueError(
-                "Especificações não pertencem ao tipo selecionado: "
-                + ", ".join(sorted(unsupported))
-            )
-        for key, value in self.specifications.items():
-            if value <= 0:
-                raise ValueError(f"A especificação '{key}' deve ser maior que zero.")
-            if key == "phase_count" and not value.is_integer():
-                raise ValueError("O número de fases deve ser inteiro.")
+    def validate_equipment(self) -> "EquipmentCreate":
+        if self.red_limit_c <= self.yellow_limit_c:
+            raise ValueError("O limite vermelho deve ser maior que o limite amarelo.")
+        if self.name and len(self.name) < 2:
+            raise ValueError("A identificação deve ter pelo menos 2 caracteres.")
+        if not self.name:
+            self.name = f"{self.manufacturer} · {EQUIPMENT_TYPE_OPTIONS[self.equipment_type]['label']}"
         return self
 
 
@@ -81,6 +65,8 @@ class EquipmentResponse(BaseModel):
     name: str = Field(alias="nome")
     equipment_type: EquipmentType = Field(alias="tipo")
     manufacturer: str | None = Field(alias="fabricante")
+    yellow_limit_c: float | None = Field(default=None, alias="limite_amarelo_c")
+    red_limit_c: float | None = Field(default=None, alias="limite_vermelho_c")
     model: str | None = Field(alias="modelo")
     serial_number: str | None = Field(alias="numero_serie")
     asset_tag: str | None = Field(alias="patrimonio")
@@ -88,6 +74,5 @@ class EquipmentResponse(BaseModel):
     criticality: EquipmentCriticality = Field(alias="criticidade")
     installation_date: date | None = Field(alias="data_instalacao")
     notes: str | None = Field(alias="observacoes")
-    specifications: dict[str, float] = Field(alias="especificacoes")
     manual_file_name: str | None = Field(alias="manual_nome_arquivo")
     created_at: datetime = Field(alias="data_cadastro")

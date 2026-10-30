@@ -16,12 +16,9 @@ export function EquipmentCreateDrawer({
   onCreated: () => Promise<void>;
 }) {
   const [equipmentType, setEquipmentType] = useState(types[0]?.equipmentType ?? "MOTOR_ELETRICO");
-  const [specifications, setSpecifications] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [manual, setManual] = useState<File>();
-
-  const selectedType = types.find((type) => type.equipmentType === equipmentType);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,7 +28,9 @@ export function EquipmentCreateDrawer({
     const input: EquipmentInput = {
       name: String(form.get("name") ?? "").trim(),
       equipmentType,
-      manufacturer: optionalValue(form, "manufacturer"),
+      manufacturer: String(form.get("manufacturer") ?? "").trim(),
+      yellowLimitC: Number(form.get("yellowLimitC")),
+      redLimitC: Number(form.get("redLimitC")),
       model: optionalValue(form, "model"),
       serialNumber: optionalValue(form, "serialNumber"),
       assetTag: optionalValue(form, "assetTag"),
@@ -39,12 +38,13 @@ export function EquipmentCreateDrawer({
       criticality: String(form.get("criticality") ?? "MEDIA") as EquipmentCriticality,
       installationDate: optionalValue(form, "installationDate"),
       notes: optionalValue(form, "notes"),
-      specifications: Object.fromEntries(
-        Object.entries(specifications)
-          .filter(([, value]) => value.trim() !== "")
-          .map(([key, value]) => [key, Number(value)]),
-      ),
     };
+
+    if (input.redLimitC <= input.yellowLimitC) {
+      setError("O limite vermelho precisa ser maior que o limite amarelo.");
+      setSaving(false);
+      return;
+    }
 
     try {
       await createEquipment(input, manual);
@@ -62,7 +62,7 @@ export function EquipmentCreateDrawer({
         <header className="flex items-start justify-between border-b border-slate-100 px-4 py-3.5 sm:px-6 sm:py-4">
           <div>
             <h2 id="equipment-create-title" className="text-lg font-semibold text-slate-900">Cadastrar equipamento</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Os campos técnicos mudam conforme o tipo escolhido.</p>
+            <p className="mt-0.5 text-xs text-slate-500">Cadastre os dados do ativo e seus limites de temperatura.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Fechar cadastro" className="flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100">
             <X aria-hidden="true" className="size-5" />
@@ -72,8 +72,8 @@ export function EquipmentCreateDrawer({
         <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-1 flex-col">
           <div className="space-y-4 overflow-y-auto p-4 sm:space-y-5 sm:p-6">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Nome do equipamento" required>
-                <input name="name" required minLength={2} maxLength={200} autoFocus placeholder="Ex.: Motor da bomba principal" className={inputClass} />
+              <Field label="Identificação do equipamento">
+                <input name="name" maxLength={200} autoFocus placeholder="Ex.: Motor da bomba principal" className={inputClass} />
               </Field>
               <Field label="Tipo" required>
                 <select
@@ -82,15 +82,14 @@ export function EquipmentCreateDrawer({
                   value={equipmentType}
                   onChange={(event) => {
                     setEquipmentType(event.target.value as typeof equipmentType);
-                    setSpecifications({});
                   }}
                   className={inputClass}
                 >
                   {types.map((type) => <option key={type.equipmentType} value={type.equipmentType}>{type.label}</option>)}
                 </select>
               </Field>
-              <Field label="Fabricante">
-                <input name="manufacturer" maxLength={120} className={inputClass} />
+              <Field label="Fabricante" required>
+                <input name="manufacturer" required minLength={1} maxLength={120} className={inputClass} />
               </Field>
               <Field label="Modelo">
                 <input name="model" maxLength={120} className={inputClass} />
@@ -117,26 +116,18 @@ export function EquipmentCreateDrawer({
               </Field>
             </div>
 
-            {selectedType?.fields.length ? (
-              <fieldset className="space-y-3 rounded-xl border border-slate-200 p-3.5 sm:p-4">
-                <legend className="px-1 text-xs font-semibold text-slate-700">Dados técnicos · {selectedType.label}</legend>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {selectedType.fields.map((field) => (
-                    <Field key={field.key} label={field.label} unit={field.unit}>
-                      <input
-                        type="number"
-                        min={field.key === "phase_count" ? "1" : "0.000001"}
-                        step={field.key === "phase_count" ? "1" : "any"}
-                        inputMode="decimal"
-                        value={specifications[field.key] ?? ""}
-                        onChange={(event) => setSpecifications((current) => ({ ...current, [field.key]: event.target.value }))}
-                        className={inputClass}
-                      />
-                    </Field>
-                  ))}
-                </div>
-              </fieldset>
-            ) : null}
+            <fieldset className="space-y-3 rounded-xl border border-slate-200 p-3.5 sm:p-4">
+              <legend className="px-1 text-xs font-semibold text-slate-700">Limites de temperatura para termografia</legend>
+              <p className="text-[11px] leading-5 text-slate-500">Defina os limites conforme o equipamento e o critério técnico adotado. O amarelo alerta o técnico; o vermelho indica abertura de OS urgente.</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Alerta ao técnico" required unit="°C">
+                  <input name="yellowLimitC" type="number" step="any" required inputMode="decimal" className={inputClass} />
+                </Field>
+                <Field label="Abertura de OS urgente" required unit="°C">
+                  <input name="redLimitC" type="number" step="any" required inputMode="decimal" className={inputClass} />
+                </Field>
+              </div>
+            </fieldset>
 
             <Field label="Observações">
               <textarea name="notes" rows={3} maxLength={2000} className={`${inputClass} resize-y py-2.5`} />

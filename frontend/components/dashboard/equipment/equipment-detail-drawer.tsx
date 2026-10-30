@@ -24,7 +24,6 @@ export function EquipmentDetailDrawer({
   const [manualLoading, setManualLoading] = useState(Boolean(equipment.manualFileName));
   const [manualError, setManualError] = useState("");
   const type = types.find((item) => item.equipmentType === equipment.equipmentType);
-  const specifications = type?.fields.filter((field) => equipment.specifications[field.key]) ?? [];
 
   useEffect(() => {
     if (!equipment.manualFileName) {
@@ -77,6 +76,8 @@ export function EquipmentDetailDrawer({
             <section>
               <h3 className="text-xs font-semibold text-slate-800">Dados do equipamento</h3>
               <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
+                <DetailFact label="Limite de alerta" value={formatLimit(equipment.yellowLimitC)} />
+                <DetailFact label="Limite para OS urgente" value={formatLimit(equipment.redLimitC)} />
                 <DetailFact label="Criticidade" value={CRITICALITY_LABELS[equipment.criticality]} />
                 <DetailFact label="Patrimônio" value={equipment.assetTag} />
                 <DetailFact label="Fabricante" value={equipment.manufacturer} />
@@ -84,7 +85,6 @@ export function EquipmentDetailDrawer({
                 <DetailFact label="Número de série" value={equipment.serialNumber} />
                 <DetailFact label="Localização" value={equipment.location} />
                 <DetailFact label="Instalação" value={formatDate(equipment.installationDate)} />
-                {specifications.map((field) => <DetailFact key={field.key} label={field.label} value={`${equipment.specifications[field.key]} ${field.unit}`} />)}
               </dl>
               {equipment.notes ? <div className="mt-4 border-t border-slate-100 pt-3"><p className="text-[10px] text-slate-400">Observações</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-700">{equipment.notes}</p></div> : null}
             </section>
@@ -122,4 +122,8 @@ function DetailFact({ label, value }: { label: string; value: string | null }) {
 
 function formatDate(value: string | null): string | null {
   return value ? new Date(`${value}T00:00:00`).toLocaleDateString("pt-BR") : null;
+}
+
+function formatLimit(value: number | null): string | null {
+  return value === null ? null : `${value.toLocaleString("pt-BR")} °C`;
 }

@@ -17,17 +17,20 @@ class PostgresEquipmentRepository:
             code = f"EQ-{datetime.now(timezone.utc).year}-{equipment_id:06d}"
             row = await connection.fetchrow(
                 """INSERT INTO equipment
-                   (id, code, name, equipment_type, manufacturer, model,
+                   (id, code, name, equipment_type, manufacturer,
+                    yellow_limit_c, red_limit_c, model,
                     serial_number, asset_tag, location, criticality,
                     installation_date, notes, specifications, manual_file_name)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-                           $13::jsonb, $14)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+                           $12, $13, $14, $15::jsonb, $16)
                    RETURNING *""",
                 equipment_id,
                 code,
                 payload["name"],
                 payload["equipment_type"].value,
                 payload.get("manufacturer"),
+                payload["yellow_limit_c"],
+                payload["red_limit_c"],
                 payload.get("model"),
                 payload.get("serial_number"),
                 payload.get("asset_tag"),
@@ -35,7 +38,7 @@ class PostgresEquipmentRepository:
                 payload["criticality"],
                 payload.get("installation_date"),
                 payload.get("notes"),
-                json.dumps(payload.get("specifications", {})),
+                json.dumps({}),
                 payload.get("manual_file_name"),
             )
             return self._to_dict(row)
@@ -62,8 +65,4 @@ class PostgresEquipmentRepository:
 
     @staticmethod
     def _to_dict(row: asyncpg.Record) -> dict[str, Any]:
-        result = dict(row)
-        specifications = result["specifications"]
-        if isinstance(specifications, str):
-            result["specifications"] = json.loads(specifications)
-        return result
+        return dict(row)
