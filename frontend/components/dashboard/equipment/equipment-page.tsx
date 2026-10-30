@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Eye, Plus, Search, Wrench } from "lucide-react";
+import Link from "next/link";
+import { Eye, Image, Plus, Search, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { EquipmentCreateDrawer } from "@/components/dashboard/equipment/equipment-create-drawer";
 import { EquipmentDetailDrawer } from "@/components/dashboard/equipment/equipment-detail-drawer";
@@ -196,9 +197,14 @@ function EquipmentCard({ equipment, types, onDetails }: { equipment: Equipment; 
         {equipment.location ? <EquipmentFact label="Local" value={equipment.location} /> : null}
         {equipment.manufacturer || equipment.model ? <EquipmentFact label="Fabricante / modelo" value={[equipment.manufacturer, equipment.model].filter(Boolean).join(" · ")} /> : null}
       </dl>
-      <button type="button" onClick={onDetails} className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-primary/30 hover:bg-teal-50 hover:text-brand-primary">
-        <Eye aria-hidden="true" className="size-3.5" /> Ver detalhes
-      </button>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link href={`/equipamentos/${equipment.id}/imagens`} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-brand-primary px-3 text-xs font-semibold text-white hover:bg-brand-primary-hover">
+          <Image aria-hidden="true" className="size-3.5" /> Imagens termográficas
+        </Link>
+        <button type="button" onClick={onDetails} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-primary/30 hover:bg-teal-50 hover:text-brand-primary">
+          <Eye aria-hidden="true" className="size-3.5" /> Ver detalhes
+        </button>
+      </div>
     </article>
   );
 }

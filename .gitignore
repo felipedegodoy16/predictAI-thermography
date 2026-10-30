@@ -3,6 +3,10 @@
 frontend/tsconfig.tsbuildinfo
 backend/manual/*
 !backend/manual/.gitkeep
+backend/images/*
+!backend/images/.gitkeep
+backend/thermography/*
+!backend/thermography/.gitkeep
 
 # Variáveis de ambiente
 .env

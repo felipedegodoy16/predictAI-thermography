@@ -154,6 +154,48 @@ export interface EquipmentInput {
   notes?: string;
 }
 
+export type ThermographyStatus = "NORMAL" | "ALERTA" | "URGENTE";
+
+export interface ThermographicImage {
+  id: number;
+  equipmentId: number;
+  equipmentName: string;
+  originalFileName: string;
+  temperatureMatrixFileName: string;
+  visibleImageFileName: string;
+  thermalImageFileName: string;
+  thermalOverlayFileName: string | null;
+  metadataFileName: string;
+  metadata: {
+    temperature_unit: string;
+    resolution: { width: number; height: number };
+    parameters: { emissivity: number; reflected_temp: number; transmission: number };
+    statistics: { min: number; max: number; mean: number; median: number };
+    overlay_alignment_version?: number;
+    overlay_registration?: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      visible_width: number;
+      visible_height: number;
+    };
+    thermal_status: ThermographyStatus;
+    limits_c: { yellow: number; red: number };
+  };
+  createdAt: string;
+}
+
+export interface ThermographicRegionMeasurement {
+  minimum: number;
+  maximum: number;
+  mean: number;
+  thermalPixels: number;
+  thermalCoveragePercent: number;
+}
+
+export type ThermographicImageAsset = "original" | "normal" | "termica" | "sobreposicao" | "matriz";
+
 export interface DashboardMonthActivity {
   month: string;
   opened: number;
@@ -626,6 +668,121 @@ export async function createEquipment(input: EquipmentInput, manual?: File): Pro
     authenticated: true,
   });
   return normalizeEquipment(result);
+}
+
+export async function listThermographicImages(equipmentId?: number): Promise<ThermographicImage[]> {
+  const query = new URLSearchParams();
+  if (equipmentId !== undefined) query.set("equipamento_id", String(equipmentId));
+  const suffix = query.size ? `?${query.toString()}` : "";
+  const result = await request<unknown[]>(`/imagens-termograficas${suffix}`, {
+    method: "GET",
+    authenticated: true,
+  });
+  return result.map(normalizeThermographicImage);
+}
+
+export async function uploadThermographicImage(
+  equipmentId: number,
+  file: File,
+): Promise<ThermographicImage> {
+  const form = new FormData();
+  form.set("equipamento_id", String(equipmentId));
+  form.set("arquivo", file);
+  const result = await request<unknown>("/imagens-termograficas", {
+    body: form,
+    authenticated: true,
+  });
+  return normalizeThermographicImage(result);
+}
+
+export async function measureThermographicRegion(
+  imageId: number,
+  region: { x: number; y: number; width: number; height: number },
+): Promise<ThermographicRegionMeasurement> {
+  const result = await request<Record<string, unknown>>(
+    `/imagens-termograficas/${imageId}/medir-regiao`,
+    {
+      body: {
+        x: region.x,
+        y: region.y,
+        largura: region.width,
+        altura: region.height,
+      },
+      authenticated: true,
+    },
+  );
+  return {
+    minimum: Number(valueOf(result, "temperatura_minima_c", "minimum")),
+    maximum: Number(valueOf(result, "temperatura_maxima_c", "maximum")),
+    mean: Number(valueOf(result, "temperatura_media_c", "mean")),
+    thermalPixels: Number(valueOf(result, "pixels_termicos", "thermal_pixels")),
+    thermalCoveragePercent: Number(valueOf(result, "cobertura_termica_percentual", "thermal_coverage_percent")),
+  };
+}
+
+function normalizeThermographicImage(value: unknown): ThermographicImage {
+  const image = value as Record<string, unknown>;
+  return {
+    id: Number(image.id),
+    equipmentId: Number(valueOf(image, "equipamento_id", "equipment_id")),
+    equipmentName: String(valueOf(image, "nome_equipamento", "equipment_name") ?? ""),
+    originalFileName: String(valueOf(image, "arquivo_original", "original_file_name") ?? ""),
+    temperatureMatrixFileName: String(valueOf(image, "matriz_temperatura", "temperature_matrix_file_name") ?? ""),
+    visibleImageFileName: String(valueOf(image, "imagem_normal", "visible_image_file_name") ?? ""),
+    thermalImageFileName: String(valueOf(image, "imagem_termica", "thermal_image_file_name") ?? ""),
+    thermalOverlayFileName: (valueOf(image, "sobreposicao_termica", "thermal_overlay_file_name") as string | null) ?? null,
+    metadataFileName: String(valueOf(image, "arquivo_metadados", "metadata_file_name") ?? ""),
+    metadata: valueOf(image, "metadados", "analysis_metadata") as ThermographicImage["metadata"],
+    createdAt: String(valueOf(image, "data_criacao", "created_at") ?? ""),
+  };
+}
+
+export async function getThermographicImageAsset(
+  imageId: number,
+  asset: ThermographicImageAsset,
+): Promise<Blob> {
+  return getAuthenticatedBlob(
+    `/imagens-termograficas/${imageId}/${asset}`,
+    "Não foi possível carregar o arquivo termográfico.",
+  );
+}
+
+async function getAuthenticatedBlob(path: string, failureMessage: string): Promise<Blob> {
+  let session = getAuthSession();
+  if (!session?.access_token) {
+    redirectToLogin();
+    throw new ApiError("Sua sessão expirou. Entre novamente.", 401);
+  }
+  let response: Response;
+  try {
+    response = await fetch(API_BASE_URL + path, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiError(failureMessage, 0);
+  }
+  if (response.status === 401) {
+    const refreshedSession = await refreshAuthSession();
+    if (!refreshedSession) {
+      redirectToLogin();
+      throw new ApiError("Sua sessão expirou. Entre novamente.", 401);
+    }
+    session = refreshedSession;
+    try {
+      response = await fetch(API_BASE_URL + path, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: "no-store",
+      });
+    } catch {
+      throw new ApiError(failureMessage, 0);
+    }
+  }
+  if (!response.ok) {
+    const result = await response.json().catch(() => null) as { detail?: unknown } | null;
+    throw new ApiError(describeError(result?.detail), response.status);
+  }
+  return response.blob();
 }
 
 export async function getEquipmentAdvice(equipmentId: number, problem: string): Promise<EquipmentAdvice> {

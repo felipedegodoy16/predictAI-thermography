@@ -9,6 +9,7 @@ import {
   ClipboardList,
   LogOut,
   Menu,
+  Images,
   UsersRound,
   Wrench,
   X,
@@ -21,6 +22,7 @@ const navigation = [
   { label: "Dashboard", href: "/dashboard", icon: ChartNoAxesCombined },
   { label: "Ordens de serviço", href: "/kanban", icon: ClipboardList },
   { label: "Equipamentos", href: "/equipamentos", icon: Wrench },
+  { label: "Imagens termográficas", href: "/imagens-termograficas", icon: Images },
   { label: "Usuários", href: "/usuarios", icon: UsersRound },
 ];
 

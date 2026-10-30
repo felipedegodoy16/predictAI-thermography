@@ -25,6 +25,9 @@ from app.infrastructure.persistence.postgres_service_order_repository import (
 from app.infrastructure.persistence.postgres_equipment_repository import (
     PostgresEquipmentRepository,
 )
+from app.infrastructure.persistence.postgres_thermographic_image_repository import (
+    PostgresThermographicImageRepository,
+)
 from app.infrastructure.persistence.postgres_dashboard_repository import (
     PostgresDashboardRepository,
 )
@@ -114,6 +117,12 @@ def get_equipment_repository(
     return PostgresEquipmentRepository(pool)
 
 
+def get_thermographic_image_repository(
+    pool: Annotated[asyncpg.Pool, Depends(get_pool)],
+) -> PostgresThermographicImageRepository:
+    return PostgresThermographicImageRepository(pool)
+
+
 def get_dashboard_repository(
     pool: Annotated[asyncpg.Pool, Depends(get_pool)],
 ) -> PostgresDashboardRepository:
@@ -152,6 +161,7 @@ __all__ = [
     "get_current_user",
     "get_service_order_repository",
     "get_equipment_repository",
+    "get_thermographic_image_repository",
     "get_dashboard_repository",
     "get_refresh_token_repository",
     "require_permissions",
