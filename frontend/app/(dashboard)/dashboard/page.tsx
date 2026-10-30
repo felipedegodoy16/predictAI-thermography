@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, ClipboardCheck, ClipboardList, RefreshCw, Timer } from "lucide-react";
-import { getDashboardSummary, type DashboardSummary, type ServiceOrderPriority, type ServiceOrderStatus } from "@/lib/api";
+import { AlertTriangle, ClipboardCheck, ClipboardList, Flame, RefreshCw, Timer } from "lucide-react";
+import { getDashboardSummary, getDashboardThermalAlerts, type DashboardSummary, type DashboardThermalAlertEquipment, type ServiceOrderPriority, type ServiceOrderStatus } from "@/lib/api";
 
 const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
   BACKLOG: "A iniciar",
@@ -36,6 +36,7 @@ const PRIORITY_COLORS: Record<ServiceOrderPriority, string> = {
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [thermalAlerts, setThermalAlerts] = useState<DashboardThermalAlertEquipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -44,7 +45,12 @@ export default function DashboardPage() {
     setError("");
     refresh ? setRefreshing(true) : setLoading(true);
     try {
-      setSummary(await getDashboardSummary());
+      const [dashboardSummary, alertingEquipment] = await Promise.all([
+        getDashboardSummary(),
+        getDashboardThermalAlerts(),
+      ]);
+      setSummary(dashboardSummary);
+      setThermalAlerts(alertingEquipment);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Não foi possível carregar o dashboard.");
     } finally {
@@ -70,6 +76,35 @@ export default function DashboardPage() {
       {error ? <div role="alert" className="rounded-xl border border-rose-200 bg-white p-5 text-center"><AlertTriangle className="mx-auto size-5 text-rose-600" /><p className="mt-2 text-sm text-rose-800">{error}</p><button type="button" onClick={() => void load()} className="mt-3 min-h-10 rounded-lg px-3 text-xs font-semibold text-brand-primary hover:bg-teal-50">Tentar novamente</button></div> : null}
 
       {!error ? <>
+        <section aria-labelledby="thermal-alerts-title" className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_5px_20px_rgba(15,45,54,0.04)]">
+          <header className="flex flex-col gap-1 border-b border-slate-100 px-4 py-3.5 sm:flex-row sm:items-end sm:justify-between sm:px-5">
+            <div>
+              <h2 id="thermal-alerts-title" className="flex items-center gap-2 text-sm font-semibold text-slate-800"><Flame aria-hidden="true" className="size-4 text-rose-600" /> Equipamentos em alerta</h2>
+            </div>
+            {!loading && thermalAlerts.length ? <span className="text-[10px] font-medium text-slate-500">{thermalAlerts.length} equipamento{thermalAlerts.length === 1 ? "" : "s"}</span> : null}
+          </header>
+          {loading ? (
+            <div role="status" className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3 xl:grid-cols-4"><span className="sr-only">Carregando alertas térmicos</span>{[0, 1, 2, 3].map((item) => <div key={item} className="h-[76px] animate-pulse rounded-xl bg-slate-50" />)}</div>
+          ) : thermalAlerts.length ? (
+            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3 xl:grid-cols-4">
+              {thermalAlerts.map((item) => (
+                <Link key={item.equipmentId} href={`/equipamentos/${item.equipmentId}/imagens`} aria-label={`${item.equipmentName}, ${item.equipmentCode}: ${item.redAlertImages} imagens vermelhas e ${item.yellowAlertImages} imagens amarelas`} className="flex min-h-[76px] min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 px-3.5 py-3 transition hover:border-brand-primary/40 hover:bg-teal-50/40">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-slate-800">{item.equipmentName}</span>
+                    <span className="mt-1 block font-mono text-[10px] text-slate-500">{item.equipmentCode}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2.5">
+                    {item.redAlertImages > 0 ? <span title={`${item.redAlertImages} imagens no limite vermelho`} className="flex size-9 items-center justify-center rounded-full bg-rose-600 text-xs font-bold tabular-nums text-white">{item.redAlertImages}</span> : null}
+                    {item.yellowAlertImages > 0 ? <span title={`${item.yellowAlertImages} imagens no limite amarelo`} className="flex size-9 items-center justify-center rounded-full bg-amber-400 text-xs font-bold tabular-nums text-amber-950">{item.yellowAlertImages}</span> : null}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="px-4 py-6 text-center text-xs text-slate-500 sm:px-5">Nenhum equipamento possui imagens acima dos limites de temperatura.</p>
+          )}
+        </section>
+
         <section aria-label="Indicadores de ordens de serviço" className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
           <MetricCard label="OS abertas" value={summary?.openOrders} icon={<ClipboardList className="size-4" />} tone="teal" loading={loading} href="/kanban" />
           <MetricCard label="OS fechadas" value={summary?.closedOrders} icon={<ClipboardCheck className="size-4" />} tone="green" loading={loading} href="/kanban" />

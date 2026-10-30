@@ -57,6 +57,27 @@ class EquipmentCreate(BaseModel):
         return self
 
 
+class EquipmentUpdate(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        str_strip_whitespace=True,
+        extra="forbid",
+    )
+
+    name: Annotated[str, Field(max_length=200)] | None = Field(default=None, alias="nome")
+    equipment_type: EquipmentType | None = Field(default=None, alias="tipo")
+    manufacturer: Annotated[str, Field(min_length=1, max_length=120)] | None = Field(default=None, alias="fabricante")
+    yellow_limit_c: float | None = Field(default=None, alias="limite_amarelo_c", allow_inf_nan=False)
+    red_limit_c: float | None = Field(default=None, alias="limite_vermelho_c", allow_inf_nan=False)
+    model: Annotated[str, Field(max_length=120)] | None = Field(default=None, alias="modelo")
+    serial_number: Annotated[str, Field(max_length=120)] | None = Field(default=None, alias="numero_serie")
+    asset_tag: Annotated[str, Field(max_length=80)] | None = Field(default=None, alias="patrimonio")
+    location: Annotated[str, Field(max_length=200)] | None = Field(default=None, alias="localizacao")
+    criticality: EquipmentCriticality | None = Field(default=None, alias="criticidade")
+    installation_date: date | None = Field(default=None, alias="data_instalacao")
+    notes: Annotated[str, Field(max_length=2000)] | None = Field(default=None, alias="observacoes")
+
+
 class EquipmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

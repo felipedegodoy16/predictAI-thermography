@@ -49,6 +49,39 @@ class PostgresEquipmentRepository:
         )
         return self._to_dict(row) if row else None
 
+    async def update(self, equipment_id: int, payload: dict[str, Any]) -> dict[str, Any] | None:
+        row = await self._pool.fetchrow(
+            """UPDATE equipment
+               SET name = $2,
+                   equipment_type = $3,
+                   manufacturer = $4,
+                   yellow_limit_c = $5,
+                   red_limit_c = $6,
+                   model = $7,
+                   serial_number = $8,
+                   asset_tag = $9,
+                   location = $10,
+                   criticality = $11,
+                   installation_date = $12,
+                   notes = $13
+               WHERE id = $1
+               RETURNING *""",
+            equipment_id,
+            payload["name"],
+            payload["equipment_type"].value,
+            payload["manufacturer"],
+            payload["yellow_limit_c"],
+            payload["red_limit_c"],
+            payload.get("model"),
+            payload.get("serial_number"),
+            payload.get("asset_tag"),
+            payload.get("location"),
+            payload["criticality"],
+            payload.get("installation_date"),
+            payload.get("notes"),
+        )
+        return self._to_dict(row) if row else None
+
     async def list(
         self, *, limit: int, offset: int, equipment_type: str | None = None
     ) -> list[dict[str, Any]]:

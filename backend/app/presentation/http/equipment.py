@@ -25,6 +25,7 @@ from app.presentation.http.dependencies import (
 from app.presentation.schemas.equipment import (
     EquipmentCreate,
     EquipmentResponse,
+    EquipmentUpdate,
     equipment_type_options,
 )
 from app.presentation.schemas.equipment_advice import (
@@ -120,6 +121,59 @@ async def list_equipments(
         offset=offset,
     )
     return [EquipmentResponse.model_validate(row) for row in rows]
+
+
+@router.patch(
+    "/{equipment_id}",
+    response_model=EquipmentResponse,
+    summary="Atualizar informações de um equipamento",
+)
+async def update_equipment(
+    equipment_id: int,
+    payload: EquipmentUpdate,
+    _: CurrentUser,
+    repository: Repository,
+) -> EquipmentResponse:
+    current = await repository.get(equipment_id)
+    if current is None:
+        raise HTTPException(status_code=404, detail="Equipamento não encontrado.")
+    if not payload.model_fields_set:
+        raise HTTPException(status_code=422, detail="Informe ao menos um campo para atualizar.")
+
+    editable_fields = (
+        "name",
+        "equipment_type",
+        "manufacturer",
+        "yellow_limit_c",
+        "red_limit_c",
+        "model",
+        "serial_number",
+        "asset_tag",
+        "location",
+        "criticality",
+        "installation_date",
+        "notes",
+    )
+    merged_payload = {field: current[field] for field in editable_fields}
+    merged_payload.update(payload.model_dump(exclude_unset=True, by_alias=False))
+    try:
+        validated_payload = EquipmentCreate.model_validate(merged_payload)
+    except ValidationError as error:
+        raise HTTPException(status_code=422, detail=error.errors(include_context=False)) from error
+
+    try:
+        updated = await repository.update(
+            equipment_id,
+            validated_payload.model_dump(by_alias=False),
+        )
+    except asyncpg.UniqueViolationError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Já existe um equipamento com este código patrimonial.",
+        ) from None
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Equipamento não encontrado.")
+    return EquipmentResponse.model_validate(updated)
 
 
 @router.get("/{equipment_id}/manual", summary="Baixar manual do equipamento")

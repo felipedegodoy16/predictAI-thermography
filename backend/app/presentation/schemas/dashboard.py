@@ -3,6 +3,16 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.domain.entity.service_order import ServiceOrderPriority, ServiceOrderStatus
 
 
+class DashboardThermalAlertEquipment(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    equipment_id: int = Field(alias="equipamento_id")
+    equipment_code: str = Field(alias="codigo_equipamento")
+    equipment_name: str = Field(alias="nome_equipamento")
+    red_alert_images: int = Field(alias="imagens_alerta_vermelho")
+    yellow_alert_images: int = Field(alias="imagens_alerta_amarelo")
+
+
 class DashboardMonthActivity(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

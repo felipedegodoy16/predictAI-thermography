@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Eye, Image, Plus, Search, Wrench } from "lucide-react";
+import { Eye, Image, Pencil, Plus, Search, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { EquipmentCreateDrawer } from "@/components/dashboard/equipment/equipment-create-drawer";
 import { EquipmentDetailDrawer } from "@/components/dashboard/equipment/equipment-detail-drawer";
@@ -36,6 +36,7 @@ export function EquipmentPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [editEquipment, setEditEquipment] = useState<Equipment | null>(null);
   const [detailEquipment, setDetailEquipment] = useState<Equipment | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -74,10 +75,11 @@ export function EquipmentPage() {
     );
   }, [equipment, search]);
 
-  async function handleCreated() {
+  async function handleSaved(editing: boolean) {
     setCreateOpen(false);
+    setEditEquipment(null);
     setRefreshKey((value) => value + 1);
-    toast.success("Equipamento cadastrado.");
+    toast.success(editing ? "Equipamento atualizado." : "Equipamento cadastrado.");
   }
 
   return (
@@ -139,7 +141,13 @@ export function EquipmentPage() {
         ) : filteredEquipment.length ? (
           <div className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3">
             {filteredEquipment.map((item) => (
-              <EquipmentCard key={item.id} equipment={item} types={types} onDetails={() => setDetailEquipment(item)} />
+              <EquipmentCard
+                key={item.id}
+                equipment={item}
+                types={types}
+                onDetails={() => setDetailEquipment(item)}
+                onEdit={() => setEditEquipment(item)}
+              />
             ))}
           </div>
         ) : equipment.length ? (
@@ -163,9 +171,19 @@ export function EquipmentPage() {
 
       {createOpen ? (
         <EquipmentCreateDrawer
+          key="new-equipment"
           types={types}
           onClose={() => setCreateOpen(false)}
-          onCreated={handleCreated}
+          onSaved={handleSaved}
+        />
+      ) : null}
+      {editEquipment ? (
+        <EquipmentCreateDrawer
+          key={`edit-equipment-${editEquipment.id}`}
+          equipment={editEquipment}
+          types={types}
+          onClose={() => setEditEquipment(null)}
+          onSaved={handleSaved}
         />
       ) : null}
       {detailEquipment ? (
@@ -175,7 +193,7 @@ export function EquipmentPage() {
   );
 }
 
-function EquipmentCard({ equipment, types, onDetails }: { equipment: Equipment; types: EquipmentTypeOption[]; onDetails: () => void }) {
+function EquipmentCard({ equipment, types, onDetails, onEdit }: { equipment: Equipment; types: EquipmentTypeOption[]; onDetails: () => void; onEdit: () => void }) {
   const type = types.find((option) => option.equipmentType === equipment.equipmentType);
   return (
     <article className="min-w-0 rounded-xl border border-slate-200 p-3.5 sm:p-4">
@@ -203,6 +221,9 @@ function EquipmentCard({ equipment, types, onDetails }: { equipment: Equipment; 
         </Link>
         <button type="button" onClick={onDetails} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-primary/30 hover:bg-teal-50 hover:text-brand-primary">
           <Eye aria-hidden="true" className="size-3.5" /> Ver detalhes
+        </button>
+        <button type="button" onClick={onEdit} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:border-brand-primary/30 hover:bg-teal-50 hover:text-brand-primary">
+          <Pencil aria-hidden="true" className="size-3.5" /> Editar
         </button>
       </div>
     </article>

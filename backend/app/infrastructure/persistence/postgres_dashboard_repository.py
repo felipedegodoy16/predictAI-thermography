@@ -67,3 +67,39 @@ class PostgresDashboardRepository:
             "by_priority": by_priority,
             "monthly_activity": [dict(row) for row in month_rows],
         }
+
+    async def thermal_alerts(self) -> list[dict[str, object]]:
+        rows = await self._pool.fetch(
+            """WITH image_temperatures AS (
+                   SELECT equipment.id AS equipment_id,
+                          equipment.code AS equipment_code,
+                          equipment.name AS equipment_name,
+                          equipment.yellow_limit_c,
+                          equipment.red_limit_c,
+                          NULLIF(images.analysis_metadata #>> '{statistics,max}', '')::DOUBLE PRECISION
+                              AS maximum_temperature
+                   FROM thermographic_images AS images
+                   JOIN equipment ON equipment.id = images.equipment_id
+                   WHERE equipment.yellow_limit_c IS NOT NULL
+                     AND equipment.red_limit_c IS NOT NULL
+               )
+               SELECT equipment_id,
+                      equipment_code,
+                      equipment_name,
+                      COUNT(*) FILTER (
+                          WHERE maximum_temperature >= red_limit_c
+                      )::INTEGER AS red_alert_images,
+                      COUNT(*) FILTER (
+                          WHERE maximum_temperature >= yellow_limit_c
+                            AND maximum_temperature < red_limit_c
+                      )::INTEGER AS yellow_alert_images
+               FROM image_temperatures
+               WHERE maximum_temperature IS NOT NULL
+               GROUP BY equipment_id, equipment_code, equipment_name
+               HAVING COUNT(*) FILTER (WHERE maximum_temperature >= yellow_limit_c) > 0
+               ORDER BY red_alert_images DESC,
+                        yellow_alert_images DESC,
+                        equipment_name ASC,
+                        equipment_id ASC"""
+        )
+        return [dict(row) for row in rows]

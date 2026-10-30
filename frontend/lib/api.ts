@@ -213,6 +213,14 @@ export interface DashboardSummary {
   monthlyActivity: DashboardMonthActivity[];
 }
 
+export interface DashboardThermalAlertEquipment {
+  equipmentId: number;
+  equipmentCode: string;
+  equipmentName: string;
+  redAlertImages: number;
+  yellowAlertImages: number;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -670,6 +678,28 @@ export async function createEquipment(input: EquipmentInput, manual?: File): Pro
   return normalizeEquipment(result);
 }
 
+export async function updateEquipment(id: number, input: EquipmentInput): Promise<Equipment> {
+  const result = await request<unknown>(`/equipamentos/${id}`, {
+    method: "PATCH",
+    body: {
+      nome: input.name || "",
+      tipo: input.equipmentType,
+      fabricante: input.manufacturer,
+      limite_amarelo_c: input.yellowLimitC,
+      limite_vermelho_c: input.redLimitC,
+      modelo: input.model || null,
+      numero_serie: input.serialNumber || null,
+      patrimonio: input.assetTag || null,
+      localizacao: input.location || null,
+      criticidade: input.criticality,
+      data_instalacao: input.installationDate || null,
+      observacoes: input.notes || null,
+    },
+    authenticated: true,
+  });
+  return normalizeEquipment(result);
+}
+
 export async function listThermographicImages(equipmentId?: number): Promise<ThermographicImage[]> {
   const query = new URLSearchParams();
   if (equipmentId !== undefined) query.set("equipamento_id", String(equipmentId));
@@ -883,4 +913,21 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
         })
       : [],
   };
+}
+
+export async function getDashboardThermalAlerts(): Promise<DashboardThermalAlertEquipment[]> {
+  const result = await request<unknown[]>("/dashboard/alertas-termicos", {
+    method: "GET",
+    authenticated: true,
+  });
+  return result.map((value) => {
+    const row = value as Record<string, unknown>;
+    return {
+      equipmentId: Number(valueOf(row, "equipamento_id", "equipment_id")),
+      equipmentCode: String(valueOf(row, "codigo_equipamento", "equipment_code") ?? ""),
+      equipmentName: String(valueOf(row, "nome_equipamento", "equipment_name") ?? ""),
+      redAlertImages: Number(valueOf(row, "imagens_alerta_vermelho", "red_alert_images") ?? 0),
+      yellowAlertImages: Number(valueOf(row, "imagens_alerta_amarelo", "yellow_alert_images") ?? 0),
+    };
+  });
 }
