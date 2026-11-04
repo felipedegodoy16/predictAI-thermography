@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000/reset-password"
     groq_api_key: SecretStr = SecretStr("")
     groq_model: str = "openai/gpt-oss-20b"
+    groq_vision_model: str = "qwen/qwen3.8-27b"
 
     @property
     def database_dsn(self) -> str:

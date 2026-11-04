@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 from uuid import UUID
 
@@ -24,6 +25,7 @@ from app.presentation.schemas.service_orders import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 Repository = Annotated[
     PostgresServiceOrderRepository, Depends(get_service_order_repository)
@@ -41,11 +43,23 @@ async def create_service_order(
     payload: ServiceOrderCreate, _: CurrentUser, repo: Repository
 ) -> ServiceOrderResponse:
     try:
-        return ServiceOrderResponse.model_validate(
-            await repo.create(payload.model_dump())
-        )
+        created = await repo.create(payload.model_dump())
     except Exception as error:
+        logger.exception(
+            "service_order.create.failed equipment_id=%s priority=%s",
+            payload.equipment_id,
+            payload.priority,
+        )
         _raise_database_error(error)
+    logger.info(
+        "service_order.create.completed service_order_id=%s code=%s equipment_id=%s priority=%s checklist_count=%s",
+        created["id"],
+        created["code"],
+        created.get("equipment_id"),
+        created["priority"],
+        len(created.get("checklist_items", [])),
+    )
+    return ServiceOrderResponse.model_validate(created)
 
 
 @router.get(

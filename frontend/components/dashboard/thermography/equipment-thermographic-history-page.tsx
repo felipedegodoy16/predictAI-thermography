@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type PointerEvent } from "react";
-import { ArrowLeft, Eye, EyeOff, Flame, Image, Square, Thermometer, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
+import { ArrowLeft, ChevronDown, Eye, EyeOff, Flame, Image, Square, Thermometer, X } from "lucide-react";
 import {
   getThermographicImageAsset,
   listEquipments,
@@ -11,14 +11,22 @@ import {
   type Equipment,
   type ThermographicImage,
   type ThermographicRegionMeasurement,
+  type ThermographyStatus,
 } from "@/lib/api";
 
 type Region = { x: number; y: number; width: number; height: number };
+const IMAGE_PAGE_SIZE = 20;
 
 export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId: number }) {
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [images, setImages] = useState<ThermographicImage[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [hasMoreImages, setHasMoreImages] = useState(false);
+  const [loadingMoreImages, setLoadingMoreImages] = useState(false);
+  const [paginationError, setPaginationError] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"TODAS" | ThermographyStatus>("TODAS");
   const [normalUrl, setNormalUrl] = useState("");
   const [overlayUrl, setOverlayUrl] = useState("");
   const [overlayVisible, setOverlayVisible] = useState(false);
@@ -28,7 +36,10 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
   const [measuring, setMeasuring] = useState(false);
   const [regionError, setRegionError] = useState("");
   const stageRef = useRef<HTMLDivElement>(null);
+  const imageListRef = useRef<HTMLUListElement>(null);
   const dragOrigin = useRef<{ x: number; y: number } | null>(null);
+  const loadedImageCountRef = useRef(0);
+  const [showImageScrollHint, setShowImageScrollHint] = useState(false);
   const [loading, setLoading] = useState(true);
   const [imageLoading, setImageLoading] = useState(false);
   const [error, setError] = useState("");
@@ -41,7 +52,12 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
       return;
     }
     setLoading(true);
-    Promise.all([listEquipments({ limit: 100 }), listThermographicImages(equipmentId)])
+    setHasMoreImages(false);
+    setPaginationError("");
+    Promise.all([
+      listEquipments({ limit: 100 }),
+      listThermographicImages(equipmentId, { limit: IMAGE_PAGE_SIZE + 1, offset: 0 }),
+    ])
       .then(([equipmentRows, imageRows]) => {
         if (!active) return;
         const selectedEquipment = equipmentRows.find((item) => item.id === equipmentId);
@@ -50,8 +66,11 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
           return;
         }
         setEquipment(selectedEquipment);
-        setImages(imageRows);
-        setSelectedId(imageRows[0]?.id ?? null);
+        const firstPage = imageRows.slice(0, IMAGE_PAGE_SIZE);
+        loadedImageCountRef.current = firstPage.length;
+        setImages(firstPage);
+        setHasMoreImages(imageRows.length > IMAGE_PAGE_SIZE);
+        setSelectedId(firstPage[0]?.id ?? null);
         setError("");
       })
       .catch((loadError: unknown) => {
@@ -61,7 +80,48 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
     return () => { active = false; };
   }, [equipmentId]);
 
-  const selectedImage = images.find((image) => image.id === selectedId) ?? null;
+  async function loadMoreImages() {
+    if (loadingMoreImages || !hasMoreImages) return;
+    setLoadingMoreImages(true);
+    setPaginationError("");
+    try {
+      const nextPage = await listThermographicImages(equipmentId, {
+        limit: IMAGE_PAGE_SIZE + 1,
+        offset: images.length,
+      });
+      const visiblePage = nextPage.slice(0, IMAGE_PAGE_SIZE);
+      loadedImageCountRef.current += visiblePage.length;
+      setImages((current) => [...current, ...visiblePage]);
+      setHasMoreImages(nextPage.length > IMAGE_PAGE_SIZE);
+    } catch (loadError) {
+      setPaginationError(loadError instanceof Error ? loadError.message : "Não foi possível carregar mais imagens.");
+    } finally {
+      setLoadingMoreImages(false);
+    }
+  }
+
+  const filteredImages = images.filter((image) => {
+    const imageDate = dateFilterValue(image.createdAt);
+    if ((dateFrom || dateTo) && !imageDate) return false;
+    return (!dateFrom || imageDate >= dateFrom)
+      && (!dateTo || imageDate <= dateTo)
+      && (statusFilter === "TODAS" || image.metadata.thermal_status === statusFilter);
+  });
+  const selectedImage = filteredImages.find((image) => image.id === selectedId) ?? filteredImages[0] ?? null;
+
+  const updateImageScrollHint = useCallback(() => {
+    const list = imageListRef.current;
+    if (!list) return;
+    const hasContentBelow = list.scrollHeight > list.clientHeight + 2
+      && list.scrollTop + list.clientHeight < list.scrollHeight - 2;
+    setShowImageScrollHint(hasContentBelow);
+  }, []);
+
+  useEffect(() => {
+    updateImageScrollHint();
+    window.addEventListener("resize", updateImageScrollHint);
+    return () => window.removeEventListener("resize", updateImageScrollHint);
+  }, [filteredImages.length, images.length, updateImageScrollHint]);
 
   useEffect(() => {
     if (!selectedImage) {
@@ -92,7 +152,10 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
         setOverlayUrl(overlayObjectUrl);
         const oldRegistration = selectedImage.metadata.overlay_registration;
         if (!hasCurrentThermalRegistration(oldRegistration)) {
-          void listThermographicImages(equipmentId).then((refreshedImages) => {
+          void listThermographicImages(equipmentId, {
+            limit: loadedImageCountRef.current,
+            offset: 0,
+          }).then((refreshedImages) => {
             if (active) setImages(refreshedImages);
           }).catch(() => undefined);
         }
@@ -215,38 +278,89 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
           <p className="mt-1 text-xs text-slate-500">Envie um arquivo IS2 para criar o primeiro registro deste equipamento.</p>
           <Link href={`/imagens-termograficas?equipamento_id=${equipmentId}`} className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-brand-primary px-4 text-xs font-semibold text-white hover:bg-brand-primary-hover">Enviar arquivo IS2</Link>
         </section>
+      ) : filteredImages.length === 0 ? (
+        <section className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
+          <Thermometer aria-hidden="true" className="mx-auto size-8 text-slate-400" />
+          <h2 className="mt-3 text-sm font-semibold text-slate-800">Nenhuma imagem encontrada</h2>
+          <p className="mt-1 text-xs text-slate-500">Ajuste o período ou a criticidade para ver outros registros.</p>
+          <button type="button" onClick={() => { setDateFrom(""); setDateTo(""); setStatusFilter("TODAS"); }} className="mt-4 inline-flex min-h-9 items-center rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">Limpar filtros</button>
+          {hasMoreImages ? <button type="button" onClick={() => void loadMoreImages()} disabled={loadingMoreImages} className="ml-2 mt-4 inline-flex min-h-9 items-center rounded-lg bg-brand-primary px-3 text-xs font-semibold text-white hover:bg-brand-primary-hover disabled:opacity-60">{loadingMoreImages ? "Carregando…" : "Carregar mais imagens"}</button> : null}
+        </section>
       ) : selectedImage ? (
         <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <aside className="flex min-h-0 flex-col self-start overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="border-b border-slate-100 px-3.5 py-3">
               <h2 className="text-xs font-semibold text-slate-800">Registros de imagem</h2>
-              <p className="mt-0.5 text-[10px] text-slate-500">{images.length} captura{images.length === 1 ? "" : "s"}</p>
+              <p className="mt-0.5 text-[10px] text-slate-500">{filteredImages.length} de {images.length} carregadas</p>
+              <p className="mt-1 text-[10px] leading-4 text-slate-500">A data indica quando a imagem foi incluída no sistema.</p>
+              <div className="mt-3 space-y-2.5 border-t border-slate-100 pt-3">
+                <fieldset className="grid grid-cols-2 gap-2">
+                  <legend className="col-span-2 mb-1.5 text-[10px] font-semibold text-slate-600">Período de inclusão</legend>
+                  <label className="min-w-0 text-[9px] text-slate-500">
+                    De
+                    <input type="date" aria-label="Data inicial" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} className="mt-1 min-h-9 w-full min-w-0 rounded-md border border-slate-200 bg-white px-1.5 text-[10px] text-slate-700 outline-none focus:border-brand-primary" />
+                  </label>
+                  <label className="min-w-0 text-[9px] text-slate-500">
+                    Até
+                    <input type="date" aria-label="Data final" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} className="mt-1 min-h-9 w-full min-w-0 rounded-md border border-slate-200 bg-white px-1.5 text-[10px] text-slate-700 outline-none focus:border-brand-primary" />
+                  </label>
+                </fieldset>
+                <label className="block text-[10px] font-semibold text-slate-600">
+                  Criticidade térmica
+                  <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "TODAS" | ThermographyStatus)} className="mt-1 min-h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-normal text-slate-700 outline-none focus:border-brand-primary">
+                    <option value="TODAS">Todas</option>
+                    <option value="URGENTE">Urgente</option>
+                    <option value="ALERTA">Alerta</option>
+                    <option value="NORMAL">Dentro dos limites</option>
+                  </select>
+                </label>
+                {(dateFrom || dateTo || statusFilter !== "TODAS") ? (
+                  <button type="button" onClick={() => { setDateFrom(""); setDateTo(""); setStatusFilter("TODAS"); }} className="text-[10px] font-semibold text-brand-primary hover:underline">Limpar filtros</button>
+                ) : null}
+              </div>
             </div>
-            <ul className="max-h-[68dvh] divide-y divide-slate-100 overflow-y-auto">
-              {images.map((image) => {
-                const active = image.id === selectedImage.id;
-                const level = image.metadata.thermal_status;
-                return (
-                  <li key={image.id}>
-                    <button type="button" aria-current={active ? "true" : undefined} onClick={() => setSelectedId(image.id)} className={`w-full px-3.5 py-3 text-left transition ${active ? "bg-teal-50" : "hover:bg-slate-50"}`}>
-                      <span className="flex items-start justify-between gap-2">
-                        <span className="min-w-0">
-                          <span className="block text-xs font-semibold text-slate-800">{formatDate(image.createdAt)}</span>
-                          <span className="mt-0.5 block truncate text-[10px] text-slate-500" title={image.originalFileName}>{image.originalFileName}</span>
+            <div className="relative min-h-0 flex-1">
+              <ul ref={imageListRef} onScroll={updateImageScrollHint} className="max-h-[80dvh] divide-y divide-slate-100 overflow-y-auto">
+                {filteredImages.map((image) => {
+                  const active = image.id === selectedImage.id;
+                  const level = image.metadata.thermal_status;
+                  return (
+                    <li key={image.id}>
+                      <button type="button" aria-current={active ? "true" : undefined} onClick={() => setSelectedId(image.id)} className={`w-full px-3.5 py-3 text-left transition ${active ? "bg-teal-50" : "hover:bg-slate-50"}`}>
+                        <span className="flex items-start justify-between gap-2">
+                          <span className="min-w-0">
+                            <span className="block text-[9px] font-medium text-slate-500">Incluída no sistema</span>
+                            <span className="mt-0.5 block text-xs font-semibold text-slate-800">{formatDate(image.createdAt)}</span>
+                            <span className="mt-0.5 block truncate text-[10px] text-slate-500" title={image.originalFileName}>{image.originalFileName}</span>
+                          </span>
+                          <span className={`mt-0.5 size-2.5 shrink-0 rounded-full ${level === "URGENTE" ? "bg-rose-500" : level === "ALERTA" ? "bg-amber-400" : "bg-emerald-500"}`} aria-label={level} title={level} />
                         </span>
-                        <span className={`mt-0.5 size-2.5 shrink-0 rounded-full ${level === "URGENTE" ? "bg-rose-500" : level === "ALERTA" ? "bg-amber-400" : "bg-emerald-500"}`} aria-label={level} title={level} />
-                      </span>
-                      <span className="mt-2 block text-[11px] font-medium text-slate-600">Máxima {formatTemperature(image.metadata.statistics.max)} °C</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                        <span className="mt-2 block text-[11px] font-medium text-slate-600">Máxima {formatTemperature(image.metadata.statistics.max)} °C</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {showImageScrollHint ? (
+                <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 flex h-12 items-end justify-center bg-gradient-to-t from-white via-white/95 to-white/0 pb-2 text-[10px] font-semibold text-slate-500">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 shadow-sm">Role para ver mais registros <ChevronDown className="size-3" /></span>
+                </div>
+              ) : null}
+            </div>
+            {paginationError ? <p role="alert" className="border-t border-rose-100 px-3.5 py-2 text-[10px] text-rose-700">{paginationError}</p> : null}
+            {hasMoreImages ? (
+              <div className="border-t border-slate-100 p-2.5">
+                <button type="button" onClick={() => void loadMoreImages()} disabled={loadingMoreImages} className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-slate-200 px-3 text-[11px] font-semibold text-slate-700 hover:border-brand-primary/40 hover:bg-teal-50 disabled:cursor-wait disabled:opacity-60">
+                  {loadingMoreImages ? "Carregando imagens…" : "Carregar mais imagens"}
+                </button>
+              </div>
+            ) : null}
           </aside>
 
           <main className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-3.5 sm:p-4">
               <div className="min-w-0">
+                <p className="text-[10px] font-medium text-slate-500">Data de inclusão no sistema</p>
                 <h2 className="truncate text-sm font-semibold text-slate-900">{formatDate(selectedImage.createdAt)}</h2>
                 <p className="mt-0.5 text-[11px] text-slate-500">{selectedImage.metadata.resolution.width} × {selectedImage.metadata.resolution.height} px · máxima {formatTemperature(selectedImage.metadata.statistics.max)} °C</p>
               </div>
@@ -406,4 +520,13 @@ function hasCurrentThermalRegistration(
 
 function formatDate(value: string): string {
   return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function dateFilterValue(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

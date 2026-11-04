@@ -1,20 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { FileImage, FileUp, Flame, ImageUp, X } from "lucide-react";
 import { toast } from "sonner";
+import { CreateOSModal } from "@/components/dashboard/service-orders/create-os-modal";
 import {
+  createServiceOrder,
   getThermographicImageAsset,
   listEquipments,
   listThermographicImages,
   uploadThermographicImage,
   type Equipment,
+  type EquipmentAdvice,
+  type ServiceOrderInput,
   type ThermographicImage,
 } from "@/lib/api";
 
 const inputClass = "min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10";
+const manualUploadEnabled = process.env.NODE_ENV !== "production";
 
 export function ThermographicImagesPage() {
+  const router = useRouter();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [equipmentId, setEquipmentId] = useState("");
   const [images, setImages] = useState<ThermographicImage[]>([]);
@@ -24,6 +31,7 @@ export function ThermographicImagesPage() {
   const [loadingEquipment, setLoadingEquipment] = useState(true);
   const [loadingImages, setLoadingImages] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [serviceOrderDraft, setServiceOrderDraft] = useState<EquipmentAdvice | null>(null);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -95,11 +103,16 @@ export function ThermographicImagesPage() {
     setUploading(true);
     setError("");
     try {
-      const uploaded = await uploadThermographicImage(Number(equipmentId), file);
-      setImages((current) => [uploaded, ...current]);
+      const result = await uploadThermographicImage(Number(equipmentId), file);
+      setImages((current) => [result.image, ...current]);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       toast.success("Imagem termográfica processada e vinculada ao equipamento.");
+      if (result.serviceOrderDraft) {
+        setServiceOrderDraft(result.serviceOrderDraft);
+      } else if (result.serviceOrderError) {
+        toast.warning("Imagem salva, mas não foi possível gerar o rascunho da OS.", { description: result.serviceOrderError });
+      }
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Não foi possível processar o arquivo IS2.");
     } finally {
@@ -133,8 +146,11 @@ export function ThermographicImagesPage() {
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-[28px]">Imagens termográficas</h1>
-        <p className="mt-1 text-xs text-slate-500 sm:text-sm">Envie arquivos IS2 para extrair a matriz radiométrica e comparar a temperatura máxima com os limites do equipamento.</p>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-[28px]">Imagens termográficas</h1>
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">Área de teste</span>
+        </div>
+        <p className="mt-1 text-xs text-slate-500 sm:text-sm">Ferramenta temporária para validar arquivos IS2, análise por IA e geração de OS. Em produção, as imagens serão recebidas diretamente da câmera termográfica.</p>
       </header>
 
       {noEquipment ? (
@@ -146,7 +162,7 @@ export function ThermographicImagesPage() {
         </section>
       ) : (
         <>
-          <form onSubmit={(event) => void handleUpload(event)} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5 lg:grid-cols-[minmax(240px,1fr)_auto] lg:items-end">
+          {manualUploadEnabled ? <form onSubmit={(event) => void handleUpload(event)} className="grid gap-4 rounded-xl border border-amber-200 bg-white p-4 sm:p-5 lg:grid-cols-[minmax(240px,1fr)_auto] lg:items-end">
             <fieldset className="min-w-0 lg:col-span-2">
               <legend className="mb-2 block text-xs font-medium text-slate-700">Selecione o equipamento ao qual a imagem pertence *</legend>
               {loadingEquipment ? (
@@ -240,7 +256,11 @@ export function ThermographicImagesPage() {
               </p>
             ) : null}
             {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-800 lg:col-span-3">{error}</p> : null}
-          </form>
+          </form> : (
+            <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+              O envio manual está desativado neste ambiente. Em produção, as imagens serão recebidas diretamente da câmera termográfica.
+            </section>
+          )}
 
           <section aria-live="polite" className="space-y-3">
             <div className="flex items-center justify-between">
@@ -263,6 +283,23 @@ export function ThermographicImagesPage() {
           </section>
         </>
       )}
+      {serviceOrderDraft ? (
+        <CreateOSModal
+          initialDraft={serviceOrderDraft}
+          initialEquipmentId={Number(equipmentId)}
+          onClose={() => setServiceOrderDraft(null)}
+          onCreate={async (input: ServiceOrderInput) => {
+            try {
+              await createServiceOrder(input);
+              setServiceOrderDraft(null);
+              toast.success("Ordem de serviço criada.");
+              router.push("/kanban");
+            } catch (createError) {
+              toast.error(createError instanceof Error ? createError.message : "Não foi possível criar a ordem de serviço.");
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -277,7 +314,7 @@ function ThermographicImageCard({ image, preview }: { image: ThermographicImage;
       <header className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 p-3.5 sm:p-4">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold text-slate-900">{image.originalFileName}</h3>
-          <p className="mt-1 text-[11px] text-slate-500">{formatDate(image.createdAt)} · {image.metadata.resolution.width} × {image.metadata.resolution.height} px</p>
+          <p className="mt-1 text-[11px] text-slate-500">Incluída no sistema em {formatDate(image.createdAt)} · {image.metadata.resolution.width} × {image.metadata.resolution.height} px</p>
         </div>
         <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusStyle}`}>
           <Flame aria-hidden="true" className="size-3.5" />{statusLabel}

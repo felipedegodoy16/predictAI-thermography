@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { FileText, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
-import { getEquipmentAdvice, listEquipments, listUserOptions, type Equipment, type ServiceOrderInput, type UserOption } from "@/lib/api";
+import { getEquipmentAdvice, listEquipments, listUserOptions, type Equipment, type EquipmentAdvice, type ServiceOrderInput, type UserOption } from "@/lib/api";
 import { PRIORITIES } from "./constants";
 
 const checklistSchema = z.object({
@@ -32,9 +32,13 @@ const inputClass =
 export function CreateOSModal({
   onClose,
   onCreate,
+  initialDraft,
+  initialEquipmentId,
 }: {
   onClose: () => void;
   onCreate: (input: ServiceOrderInput) => Promise<void>;
+  initialDraft?: EquipmentAdvice;
+  initialEquipmentId?: number;
 }) {
   const [users, setUsers] = useState<UserOption[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -60,6 +64,23 @@ export function CreateOSModal({
       checklistItems: [{ description: "", required: true }],
     },
   });
+  const { reset } = form;
+
+  useEffect(() => {
+    if (!initialDraft) return;
+    reset({
+      title: initialDraft.title,
+      description: initialDraft.description,
+      priority: initialDraft.priority,
+      clientId: "",
+      equipmentId: initialEquipmentId ? String(initialEquipmentId) : "",
+      technicianId: "",
+      dueAt: "",
+      checklistItems: initialDraft.checklistItems.map(({ description, required }) => ({ description, required })),
+    });
+    setAdviceApplied(true);
+    setAdviceChecklistCount(initialDraft.checklistItems.length);
+  }, [initialDraft, initialEquipmentId, reset]);
   const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: "checklistItems",

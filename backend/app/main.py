@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
@@ -10,6 +11,11 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.domain.exceptions.user import UserAlreadyExistsError
 from app.infrastructure.database.postgres import Database
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
 
 def create_app(database: Database | None = None) -> FastAPI:

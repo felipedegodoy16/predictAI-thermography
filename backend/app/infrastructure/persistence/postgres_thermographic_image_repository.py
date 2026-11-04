@@ -56,14 +56,23 @@ class PostgresThermographicImageRepository:
             json.dumps(metadata, ensure_ascii=False, allow_nan=False),
         )
 
-    async def list(self, *, equipment_id: int | None = None) -> list[dict[str, Any]]:
+    async def list(
+        self,
+        *,
+        equipment_id: int | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
         rows = await self._pool.fetch(
             """SELECT images.*, equipment.name AS equipment_name
                FROM thermographic_images AS images
                JOIN equipment ON equipment.id = images.equipment_id
                WHERE ($1::BIGINT IS NULL OR images.equipment_id = $1)
-               ORDER BY images.created_at DESC, images.id DESC""",
+               ORDER BY images.created_at DESC, images.id DESC
+               LIMIT $2 OFFSET $3""",
             equipment_id,
+            limit,
+            offset,
         )
         return [self._to_dict(row) for row in rows]
 

@@ -22,7 +22,7 @@ const navigation = [
   { label: "Dashboard", href: "/dashboard", icon: ChartNoAxesCombined },
   { label: "Ordens de serviço", href: "/kanban", icon: ClipboardList },
   { label: "Equipamentos", href: "/equipamentos", icon: Wrench },
-  { label: "Imagens termográficas", href: "/imagens-termograficas", icon: Images },
+  { label: "Imagens termográficas", href: "/imagens-termograficas", icon: Images, testOnly: true },
   { label: "Usuários", href: "/usuarios", icon: UsersRound },
 ];
 
@@ -106,12 +106,13 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </button>
         </div>
         <nav aria-label="Navegação principal" className="mt-6 space-y-1.5">
-          {navigation.map(({ label, href, icon: Icon }) => {
+          {navigation.map(({ label, href, icon: Icon, testOnly }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             const content = (
               <>
                 <Icon aria-hidden="true" className="size-[18px] shrink-0" />
                 <span className="flex-1">{label}</span>
+                {testOnly ? <span className="rounded-full bg-amber-200/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-200">Teste</span> : null}
               </>
             );
             const className =

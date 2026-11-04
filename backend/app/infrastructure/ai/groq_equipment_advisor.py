@@ -1,10 +1,13 @@
 import asyncio
+import base64
+from io import BytesIO
 import json
 import re
 from pathlib import Path
 from typing import Any
 
 import httpx
+from PIL import Image
 from pypdf import PdfReader
 
 
@@ -112,6 +115,88 @@ async def get_equipment_advice(
         return json.loads(content)
 
 
+async def get_thermographic_service_order_advice(
+    *,
+    api_key: str,
+    model: str,
+    thermal_image_path: Path,
+    manual_path: Path | None,
+    equipment_description: str,
+    thermal_status: str,
+    maximum_temperature: float,
+    yellow_limit: float,
+    red_limit: float,
+) -> dict[str, Any]:
+    manual_context = ""
+    if manual_path is not None and manual_path.is_file():
+        try:
+            manual_context = await asyncio.to_thread(
+                extract_relevant_manual_text,
+                manual_path,
+                f"{equipment_description} superaquecimento termografia manutenção",
+            )
+        except ManualTextUnavailableError:
+            # A imagem ainda deve gerar uma OS quando o manual não tiver texto extraível.
+            manual_context = ""
+
+    image_bytes = await asyncio.to_thread(_encode_thermal_image, thermal_image_path)
+    image_data_url = "data:image/jpeg;base64," + base64.b64encode(image_bytes).decode("ascii")
+    headers = {"Authorization": f"Bearer {api_key}"}
+    user_text = (
+        f"Equipamento: {equipment_description}\n"
+        f"Status térmico: {thermal_status}\n"
+        f"Temperatura máxima medida: {maximum_temperature:.2f} °C\n"
+        f"Limite amarelo: {yellow_limit:.2f} °C\n"
+        f"Limite vermelho: {red_limit:.2f} °C\n\n"
+        "Analise a imagem térmica anexada e prepare um rascunho de ordem de serviço corretiva. "
+        "Considere os limites e a temperatura medida como fatos; trate causas visuais como hipóteses. "
+        "Use o manual abaixo como referência quando houver conteúdo. Não invente especificações.\n\n"
+        f"Trechos do manual (páginas de origem):\n{manual_context or 'Manual não disponível.'}"
+    )
+    async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=15.0)) as client:
+        response = await client.post(
+            GROQ_CHAT_COMPLETIONS_URL,
+            headers=headers,
+            json={
+                "model": model,
+                "temperature": 0.2,
+                "max_completion_tokens": 1200,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Você é um assistente de manutenção industrial que prepara um rascunho de ordem de serviço. "
+                            "Crie título conciso, descrição com fatos separados de hipóteses, prioridade e checklist "
+                            "ordenado com 4 a 8 ações práticas. Inclua verificações de segurança, bloqueio e etiquetagem. "
+                            "Nunca recomende trabalhar energizado, remover proteções ou ignorar bloqueios. "
+                            "Cite páginas do manual quando disponíveis. Retorne somente o JSON no esquema solicitado."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": user_text},
+                            {"type": "image_url", "image_url": {"url": image_data_url}},
+                        ],
+                    },
+                ],
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "thermographic_service_order_draft",
+                        "strict": True,
+                        "schema": EQUIPMENT_ADVICE_SCHEMA,
+                    },
+                },
+            },
+        )
+        response.raise_for_status()
+        content = response.json()["choices"][0]["message"].get("content")
+        if not content:
+            raise ValueError("Groq returned an empty thermographic service order draft.")
+        return json.loads(content)
+
+
 def extract_relevant_manual_text(manual_path: Path, query: str) -> str:
     try:
         reader = PdfReader(str(manual_path))
@@ -161,3 +246,11 @@ def extract_relevant_manual_text(manual_path: Path, query: str) -> str:
         selected = [(number, f"[Página {number}]\n{text[:MAX_MANUAL_CONTEXT_CHARS]}") for number, text in pages[:1]]
     selected.sort(key=lambda entry: entry[0])
     return "\n\n".join(section for _, section in selected)
+
+
+def _encode_thermal_image(image_path: Path) -> bytes:
+    with Image.open(image_path) as image:
+        image.thumbnail((1600, 1600))
+        output = BytesIO()
+        image.convert("RGB").save(output, format="JPEG", quality=88, optimize=True)
+        return output.getvalue()

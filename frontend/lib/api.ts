@@ -186,6 +186,12 @@ export interface ThermographicImage {
   createdAt: string;
 }
 
+export interface ThermographicImageUploadResult {
+  image: ThermographicImage;
+  serviceOrderDraft?: EquipmentAdvice;
+  serviceOrderError?: string;
+}
+
 export interface ThermographicRegionMeasurement {
   minimum: number;
   maximum: number;
@@ -700,9 +706,16 @@ export async function updateEquipment(id: number, input: EquipmentInput): Promis
   return normalizeEquipment(result);
 }
 
-export async function listThermographicImages(equipmentId?: number): Promise<ThermographicImage[]> {
+export async function listThermographicImages(
+  equipmentId?: number,
+  pagination?: { limit: number; offset: number },
+): Promise<ThermographicImage[]> {
   const query = new URLSearchParams();
   if (equipmentId !== undefined) query.set("equipamento_id", String(equipmentId));
+  if (pagination) {
+    query.set("limit", String(pagination.limit));
+    query.set("offset", String(pagination.offset));
+  }
   const suffix = query.size ? `?${query.toString()}` : "";
   const result = await request<unknown[]>(`/imagens-termograficas${suffix}`, {
     method: "GET",
@@ -714,7 +727,7 @@ export async function listThermographicImages(equipmentId?: number): Promise<The
 export async function uploadThermographicImage(
   equipmentId: number,
   file: File,
-): Promise<ThermographicImage> {
+): Promise<ThermographicImageUploadResult> {
   const form = new FormData();
   form.set("equipamento_id", String(equipmentId));
   form.set("arquivo", file);
@@ -722,7 +735,13 @@ export async function uploadThermographicImage(
     body: form,
     authenticated: true,
   });
-  return normalizeThermographicImage(result);
+  const response = result as Record<string, unknown>;
+  const draft = valueOf(response, "ordem_servico_rascunho", "service_order_draft");
+  return {
+    image: normalizeThermographicImage(result),
+    serviceOrderDraft: draft ? normalizeEquipmentAdvice(draft) : undefined,
+    serviceOrderError: (valueOf(response, "erro_geracao_os", "service_order_error") as string | null) ?? undefined,
+  };
 }
 
 export async function measureThermographicRegion(
@@ -820,7 +839,11 @@ export async function getEquipmentAdvice(equipmentId: number, problem: string): 
     body: { problema: problem },
     authenticated: true,
   });
-  const advice = result as Record<string, unknown>;
+  return normalizeEquipmentAdvice(result);
+}
+
+function normalizeEquipmentAdvice(value: unknown): EquipmentAdvice {
+  const advice = value as Record<string, unknown>;
   const checklist = valueOf(advice, "checklist_itens", "checklist");
   return {
     title: String(valueOf(advice, "titulo", "title") ?? ""),
