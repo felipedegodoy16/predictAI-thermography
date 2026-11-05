@@ -1,3 +1,5 @@
+import asyncio
+
 import asyncpg
 
 
@@ -15,21 +17,29 @@ class Database:
         self.min_pool_size = min_pool_size
         self.max_pool_size = max_pool_size
         self.pool: asyncpg.Pool | None = None
+        self._lifecycle_lock = asyncio.Lock()
 
     async def connect(self) -> None:
-        if self.pool is not None:
-            return
-        self.pool = await asyncpg.create_pool(
-            dsn=self.database_url,
-            min_size=self.min_pool_size,
-            max_size=self.max_pool_size,
-            command_timeout=30,
-        )
+        async with self._lifecycle_lock:
+            if self.pool is not None:
+                return
+            pool = await asyncpg.create_pool(
+                dsn=self.database_url,
+                min_size=self.min_pool_size,
+                max_size=self.max_pool_size,
+                command_timeout=30,
+            )
+            self.pool = pool
 
     async def disconnect(self) -> None:
-        if self.pool is not None:
-            await self.pool.close()
-            self.pool = None
+        async with self._lifecycle_lock:
+            if self.pool is None:
+                return
+            pool = self.pool
+            try:
+                await pool.close()
+            finally:
+                self.pool = None
 
     def get_pool(self) -> asyncpg.Pool:
         if self.pool is None:

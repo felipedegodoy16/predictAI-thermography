@@ -158,9 +158,11 @@ classDiagram
 
     namespace Infrastructure {
         class Database {
+            <<Singleton: escopo da aplicação>>
             +connect()
             +disconnect()
             +get_pool()
+            -_lifecycle_lock: asyncio.Lock
         }
         class AsyncpgPool {
             <<external>>
@@ -299,6 +301,7 @@ classDiagram
 - `IUserRepository` é o único contrato formal de repositório no domínio. Os demais repositórios PostgreSQL são classes concretas dependidas diretamente pelos routers.
 - Os routers de equipamento, imagens termográficas, ordens de serviço e dashboard usam os repositórios concretos em seus handlers. As dependências `get_*` também permitem compor alguns desses repositórios e casos de uso.
 - O fluxo de envio de termografia instancia `Is2ThermographyProcessor` diretamente. Por isso, o processador aparece no diagrama de sistema, mas não é marcado como Strategy: não existe contrato intercambiável de processador no código atual.
+- `Database` é a instância única usada pela aplicação FastAPI para manter o `asyncpg.Pool`; `dependencies.py` obtém esse mesmo pool por `app.state.database`. O escopo é uma instância da aplicação/worker, não um Singleton global compartilhado entre processos ou réplicas.
 
 ## Diagrama dos design patterns utilizados
 
@@ -418,6 +421,51 @@ classDiagram
 | Facade | Oferece aos componentes uma API frontend simplificada e centraliza detalhes de HTTP e sessão. | `frontend/lib/api.ts`, com `request()` e funções por recurso. |
 
 Repository e injeção de dependência são mostrados como arquitetura auxiliar, não como padrões GoF. Para a análise de aderência, limitações e conceitos parecidos com padrões, consulte [DESIGN_PATTERNS.md](DESIGN_PATTERNS.md).
+
+### Singleton — pool do banco de dados
+
+O sistema mantém um pool `asyncpg` compartilhado durante o ciclo de vida de cada aplicação FastAPI. `create_app()` cria ou recebe um `Database`, guarda essa instância em `application.state.database`, conecta no `lifespan` e fecha o pool ao encerrar. As dependências HTTP recuperam o mesmo pool nas requisições. A trava de ciclo de vida serializa chamadas concorrentes a `connect()` e `disconnect()`, evitando a criação de dois pools no mesmo `Database`.
+
+```mermaid
+classDiagram
+    direction LR
+    class FastAPIApplication {
+        +state.database: Database
+        +lifespan_start()
+        +lifespan_stop()
+    }
+    class Database {
+        <<Singleton: escopo da aplicação>>
+        -database_url: str
+        -pool: asyncpg.Pool?
+        -_lifecycle_lock: asyncio.Lock
+        +connect()
+        +disconnect()
+        +get_pool()
+    }
+    class AsyncpgPool {
+        <<pool compartilhado>>
+        +acquire()
+        +close()
+    }
+    class RequestDependencies {
+        +get_pool(request)
+    }
+    class Repositories {
+        <<consumidores>>
+        +query()
+        +persist()
+    }
+
+    FastAPIApplication "1" *-- "1" Database : guarda no state
+    Database "1" *-- "0..1" AsyncpgPool : cria e fecha
+    RequestDependencies ..> FastAPIApplication : consulta request.app
+    RequestDependencies ..> Database : recupera a instância
+    RequestDependencies ..> AsyncpgPool : fornece o pool compartilhado
+    Repositories ..> AsyncpgPool : adquire conexões para operações
+```
+
+O Singleton aqui é **delimitado por aplicação**. Cada worker de servidor e cada réplica/container tem sua própria aplicação e, portanto, seu próprio pool. O pool não é uma conexão única: ele fornece conexões às operações concorrentes. `create_app(database=...)` continua permitindo injetar um `Database` alternativo, por exemplo em testes.
 
 ## Como o backend está organizado
 

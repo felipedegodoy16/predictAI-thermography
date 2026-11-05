@@ -1,6 +1,6 @@
 # Design patterns GoF no PredictAI Thermography
 
-- **Revisado em:** 04/11/2026
+- **Revisado em:** 05/11/2026
 - **Escopo:** padrões de projeto do catálogo GoF que têm evidência no código atual. Conceitos arquiteturais são identificados separadamente para evitar confusão de nomenclatura.
 
 ## 1. Padrões GoF encontrados
@@ -17,7 +17,7 @@ Estes pontos têm semelhança com um padrão GoF, mas não devem ser tratados co
 
 | Conceito | Onde aparece | O que o código faz | Por que é parcial |
 |---|---|---|---|
-| **Singleton, variante por módulo** | `backend/app/core/config.py` (`settings = Settings()`); `backend/app/main.py` e `backend/app/infrastructure/database/postgres.py` | O módulo de configuração expõe um objeto `settings` compartilhado por imports. `create_app` mantém uma instância `Database` no ciclo de vida daquela aplicação. | Não há controle de construção que garanta uma única instância global em todos os contextos. `create_app(database=...)` permite fornecer outra instância, e o banco é único por aplicação, não necessariamente por processo. É mais preciso chamar isso de configuração compartilhada e recurso com escopo de aplicação. |
+| **Singleton, escopo da aplicação (pool)** | `backend/app/main.py` e `backend/app/infrastructure/database/postgres.py` | Cada aplicação FastAPI mantém um `Database` em `application.state.database`; esse objeto cria e compartilha um único `asyncpg.Pool` entre as requisições durante seu ciclo de vida. Um `asyncio.Lock` serializa a inicialização e o encerramento do pool. | É um Singleton gerenciado no escopo da aplicação, não um Singleton global GoF: `create_app(database=...)` permite injeção, e cada worker/réplica tem seu próprio pool. A configuração `settings = Settings()` é compartilhada por import, mas não é o dono do pool. |
 | **Adapter, na integração Groq** | `backend/app/infrastructure/ai/groq_equipment_advisor.py` e endpoints de equipamento/termografia | O módulo monta requisições no formato Groq, chama HTTP, extrai JSON e entrega dados que os esquemas da aplicação validam como rascunho de OS. | A fronteira traduz formatos do provedor, lembrando Adapter. Porém, não há uma porta independente do fornecedor que defina o contrato esperado; os endpoints importam diretamente funções e configurações específicas da Groq. A integração continua acoplada ao provedor. |
 
 ## 3. Padrões arquiteturais presentes, mas fora do catálogo GoF
@@ -44,23 +44,15 @@ Essa lista não significa que o sistema deva implementar esses padrões. Ela ape
 
 ## 5. Resumo
 
-Os usos GoF mais consistentes são **Strategy** para a criptografia de senha, **Observer** para atualizar o nome do perfil entre componentes e **Facade** no cliente de API frontend. O restante da estrutura usa principalmente princípios arquiteturais (Repository, injeção de dependência e separação em camadas), que são úteis, mas pertencem a outra classificação.
+Os usos GoF mais consistentes são **Strategy** para a criptografia de senha, **Observer** para atualizar o nome do perfil entre componentes e **Facade** no cliente de API frontend. O pool do banco é compartilhado como Singleton no escopo de cada aplicação; Repository, injeção de dependência e separação em camadas são conceitos arquiteturais auxiliares.
 
-## 6. Singleton para conexão com o banco
+## 6. Singleton do pool do banco
 
-### Decisão recomendada
+O sistema usa um **Singleton com escopo da aplicação FastAPI** para o pool, sem impor uma variável global ao processo. `create_app()` constrói ou recebe uma instância `Database`, publica-a em `application.state.database`, e o `lifespan` chama `connect()` ao iniciar e `disconnect()` ao encerrar. As dependências das requisições recuperam sempre essa mesma instância e seu pool.
 
-**Não implementar agora um Singleton global de processo para `Database`.** A aplicação já cria um objeto `Database` por instância FastAPI em `create_app`, guarda-o em `application.state.database`, abre o pool no `lifespan` e fecha-o ao encerrar a aplicação. Essa é uma delimitação de ciclo de vida explícita e permite injetar outro `Database` em testes.
+O recurso compartilhado é `asyncpg.Pool`, não uma conexão individual. O pool empresta conexões às operações concorrentes e limita a quantidade conforme `DATABASE_MAX_POOL_SIZE` (padrão atual 10 por instância). Os métodos `connect()` e `disconnect()` usam um `asyncio.Lock` da instância para que duas inicializações ou encerramentos concorrentes não criem, fechem ou publiquem pools duplicados. O lock não participa das consultas normais.
 
-O recurso compartilhado em requisições é o `asyncpg.Pool`, não uma conexão única. O pool empresta conexões para operações concorrentes e limita o máximo conforme `DATABASE_MAX_POOL_SIZE` (padrão atual 10 por instância). Assim, um Singleton de conexão única seria a abstração errada: serializaria operações ou permitiria uso concorrente indevido da mesma conexão.
-
-Um Singleton global também teria escopo apenas do processo Python: cada worker do servidor e cada réplica/container criaria seu próprio Singleton e pool. Portanto, ele não garantiria um único pool para toda a implantação. Um Singleton global pode ainda tornar mais difícil rodar múltiplas aplicações/configurações ou event loops no mesmo processo de teste.
-
-### Concorrência e proteção de ciclo de vida
-
-O uso normal cria e conecta o pool uma vez no `lifespan`; não há necessidade de bloquear cada consulta. O próprio pool é o mecanismo de concorrência para obter conexões. Há, porém, uma pequena janela em `Database.connect()`: a checagem `pool is not None` ocorre antes do `await create_pool()`. Se duas tarefas chamarem `connect()` simultaneamente no mesmo objeto, ambas podem iniciar a criação e a última atribuição pode ocultar o outro pool.
-
-Se o objeto passar a admitir inicialização/encerramento concorrentes, a recomendação é manter o escopo por aplicação e proteger **somente** `connect()`/`disconnect()` com um `asyncio.Lock` da própria instância. O lock deve abranger a verificação, criação/atribuição do pool e encerramento/limpeza. Isso torna o ciclo de vida idempotente no mesmo event loop sem colocar um lock no caminho de todas as consultas. Se o contrato continuar sendo “um único lifespan sequencial”, o ajuste pode aguardar até que haja um caso real de inicialização concorrente.
+O escopo é deliberado: cada worker/processo e cada réplica/container tem uma aplicação e um pool próprios. Um Singleton Python global não unificaria pools entre processos e poderia misturar configurações ou event loops. `create_app(database=...)` também mantém a capacidade de injetar outra instância, por exemplo, em testes.
 
 ```mermaid
 classDiagram
@@ -70,9 +62,10 @@ classDiagram
         +lifespan_stop()
     }
     class Database {
+        <<Singleton: escopo da aplicação>>
         +database_url
         +pool: asyncpg.Pool?
-        -lifecycle_lock: asyncio.Lock
+        -_lifecycle_lock: asyncio.Lock
         +connect()
         +disconnect()
         +get_pool()
@@ -91,9 +84,7 @@ classDiagram
     RequestDependencies ..> AsyncpgPool : fornece às operações
 ```
 
-O diagrama mostra o recurso atualmente existente e o `lifecycle_lock` como melhoria opcional, não como implementação já presente. `asyncpg.Pool` oferece aquisição e liberação de conexões; veja a [documentação oficial de pools do asyncpg](https://magicstack.github.io/asyncpg/current/api/index.html#connection-pools).
-
-Se o time ainda quiser um Singleton por worker, ele deve ser descrito como **um `Database` por processo/event loop**, com trava síncrona para publicar/criar a instância em cenários multi-thread e trava assíncrona para serializar sua inicialização/encerramento. Isso não compartilha conexões entre processos e não parece trazer benefício sobre o escopo atual por aplicação.
+O `asyncio.Lock` agora faz parte da implementação e protege o ciclo de vida do pool. `asyncpg.Pool` oferece aquisição e liberação de conexões; veja a [documentação oficial de pools do asyncpg](https://magicstack.github.io/asyncpg/current/api/index.html#connection-pools).
 
 ## 7. Factory Method e Abstract Factory
 
