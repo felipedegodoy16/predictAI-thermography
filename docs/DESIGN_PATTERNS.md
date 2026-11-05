@@ -1,6 +1,6 @@
 # Design patterns GoF no PredictAI Thermography
 
-- **Revisado em:** 04/11/2026
+- **Revisado em:** 05/11/2026
 - **Escopo:** padrões de projeto do catálogo GoF que têm evidência no código atual. Conceitos arquiteturais são identificados separadamente para evitar confusão de nomenclatura.
 
 ## 1. Padrões GoF encontrados
@@ -10,6 +10,7 @@
 | **Strategy** | Comportamental | `backend/app/application/ports/password_hasher.py`; `backend/app/infrastructure/security/argon2_password_hasher.py`; `backend/app/presentation/http/dependencies.py`; `backend/app/application/use_cases/users/create_user.py` e `authenticate_user.py` | `PasswordHasher` define o contrato para calcular e verificar hashes. `Argon2PasswordHasher` é a estratégia concreta usada pelos casos de uso de cadastro e autenticação. Os casos de uso dependem do contrato, então a implementação criptográfica pode ser substituída sem reescrever a regra de cadastro/login. | **Claro no desenho, com uma estratégia concreta em produção.** A troca da estratégia é feita pela composição/dependência, não por seleção dinâmica dentro do caso de uso. |
 | **Observer** | Comportamental | `frontend/components/dashboard/profile/profile-page.tsx` (publica `auth-profile-updated`); `frontend/components/dashboard/dashboard-shell.tsx` (assina o evento) | Depois que o perfil é atualizado, a tela publica um evento no `window`. O shell observa esse evento e atualiza o nome exibido na navegação. O emissor não chama diretamente o componente que precisa reagir. | **Uso localizado e explícito.** Há um evento e um consumidor conhecido; não existe um barramento geral de eventos no produto. |
 | **Facade** | Estrutural | `frontend/lib/api.ts`, especialmente `request<T>()` e as funções públicas por recurso | O módulo oferece às telas uma interface simples para chamar a API. Ele centraliza URL base, serialização, autenticação, renovação concorrente de sessão, repetição após 401, tratamento de erros e mapeamento das respostas. Os componentes chamam funções como `listEquipments` ou `uploadThermographicImage` sem duplicar o protocolo HTTP. | **Claro como fachada do cliente HTTP.** O arquivo também funciona como módulo de serviços/API client; Facade descreve o papel simplificador perante os componentes. |
+| **Singleton** | Criacional | `backend/app/infrastructure/database/postgres.py` (`Database.get_instance`) e `backend/app/main.py` (`create_app`) | A composição padrão da aplicação obtém um único `Database` por processo, responsável por criar e compartilhar o pool `asyncpg`. A construção do Singleton é protegida por `threading.Lock`; `connect()` e `disconnect()` usam um `asyncio.Lock` para serializar inicialização e encerramento concorrentes. | **Implementado no caminho de produção.** Aplicações de teste podem receber um `Database` explícito. Cada processo/worker tem seu próprio pool; não é Singleton distribuído. |
 
 ## 2. Usos parciais ou parecidos com GoF
 
@@ -17,7 +18,6 @@ Estes pontos têm semelhança com um padrão GoF, mas não devem ser tratados co
 
 | Conceito | Onde aparece | O que o código faz | Por que é parcial |
 |---|---|---|---|
-| **Singleton, variante por módulo** | `backend/app/core/config.py` (`settings = Settings()`); `backend/app/main.py` e `backend/app/infrastructure/database/postgres.py` | O módulo de configuração expõe um objeto `settings` compartilhado por imports. `create_app` mantém uma instância `Database` no ciclo de vida daquela aplicação. | Não há controle de construção que garanta uma única instância global em todos os contextos. `create_app(database=...)` permite fornecer outra instância, e o banco é único por aplicação, não necessariamente por processo. É mais preciso chamar isso de configuração compartilhada e recurso com escopo de aplicação. |
 | **Adapter, na integração Groq** | `backend/app/infrastructure/ai/groq_equipment_advisor.py` e endpoints de equipamento/termografia | O módulo monta requisições no formato Groq, chama HTTP, extrai JSON e entrega dados que os esquemas da aplicação validam como rascunho de OS. | A fronteira traduz formatos do provedor, lembrando Adapter. Porém, não há uma porta independente do fornecedor que defina o contrato esperado; os endpoints importam diretamente funções e configurações específicas da Groq. A integração continua acoplada ao provedor. |
 
 ## 3. Padrões arquiteturais presentes, mas fora do catálogo GoF
@@ -44,23 +44,19 @@ Essa lista não significa que o sistema deva implementar esses padrões. Ela ape
 
 ## 5. Resumo
 
-Os usos GoF mais consistentes são **Strategy** para a criptografia de senha, **Observer** para atualizar o nome do perfil entre componentes e **Facade** no cliente de API frontend. O restante da estrutura usa principalmente princípios arquiteturais (Repository, injeção de dependência e separação em camadas), que são úteis, mas pertencem a outra classificação.
+Os padrões GoF identificados são **Strategy** para hash de senha, **Observer** para sincronizar o nome do perfil no frontend, **Facade** para o cliente de API e **Singleton** para o proprietário do pool PostgreSQL. O restante da estrutura inclui padrões arquiteturais como Repository, injeção de dependência e separação em camadas.
 
 ## 6. Singleton para conexão com o banco
 
-### Decisão recomendada
+### Implementação e escopo
 
-**Não implementar agora um Singleton global de processo para `Database`.** A aplicação já cria um objeto `Database` por instância FastAPI em `create_app`, guarda-o em `application.state.database`, abre o pool no `lifespan` e fecha-o ao encerrar a aplicação. Essa é uma delimitação de ciclo de vida explícita e permite injetar outro `Database` em testes.
+`Database.get_instance()` mantém a instância de produção do proprietário do pool em nível de processo e rejeita uma segunda configuração divergente, em vez de conectar silenciosamente ao banco errado. `create_app(database=...)` continua aceitando uma instância explícita para testes e composições isoladas. O pool é aberto no `lifespan` e fechado no encerramento da aplicação.
 
-O recurso compartilhado em requisições é o `asyncpg.Pool`, não uma conexão única. O pool empresta conexões para operações concorrentes e limita o máximo conforme `DATABASE_MAX_POOL_SIZE` (padrão atual 10 por instância). Assim, um Singleton de conexão única seria a abstração errada: serializaria operações ou permitiria uso concorrente indevido da mesma conexão.
+O ciclo de vida padrão pressupõe uma aplicação FastAPI ativa por processo. Para executar aplicações isoladas simultaneamente no mesmo processo, injete uma instância `Database` própria em cada aplicação, evitando que o encerramento de uma delas feche o pool usado pela outra.
 
-Um Singleton global também teria escopo apenas do processo Python: cada worker do servidor e cada réplica/container criaria seu próprio Singleton e pool. Portanto, ele não garantiria um único pool para toda a implantação. Um Singleton global pode ainda tornar mais difícil rodar múltiplas aplicações/configurações ou event loops no mesmo processo de teste.
+O Singleton compartilha um **pool**, não uma conexão individual. O `asyncpg.Pool` empresta conexões para requisições concorrentes e limita o máximo conforme `DATABASE_MAX_POOL_SIZE` (padrão 10). Cada worker/processo mantém seu próprio Singleton e pool; não há compartilhamento entre processos, réplicas ou contêineres.
 
-### Concorrência e proteção de ciclo de vida
-
-O uso normal cria e conecta o pool uma vez no `lifespan`; não há necessidade de bloquear cada consulta. O próprio pool é o mecanismo de concorrência para obter conexões. Há, porém, uma pequena janela em `Database.connect()`: a checagem `pool is not None` ocorre antes do `await create_pool()`. Se duas tarefas chamarem `connect()` simultaneamente no mesmo objeto, ambas podem iniciar a criação e a última atribuição pode ocultar o outro pool.
-
-Se o objeto passar a admitir inicialização/encerramento concorrentes, a recomendação é manter o escopo por aplicação e proteger **somente** `connect()`/`disconnect()` com um `asyncio.Lock` da própria instância. O lock deve abranger a verificação, criação/atribuição do pool e encerramento/limpeza. Isso torna o ciclo de vida idempotente no mesmo event loop sem colocar um lock no caminho de todas as consultas. Se o contrato continuar sendo “um único lifespan sequencial”, o ajuste pode aguardar até que haja um caso real de inicialização concorrente.
+`threading.Lock` protege a publicação da instância na criação concorrente. Um `asyncio.Lock` por `Database` cobre toda a sequência de verificação/criação e encerramento/limpeza, evitando que chamadas concorrentes a `connect()` abram pools duplicados ou que `connect()` e `disconnect()` alterem simultaneamente o estado do ciclo de vida. Consultas não adquirem esse lock: a concorrência de operações permanece a cargo do pool.
 
 ```mermaid
 classDiagram
@@ -72,7 +68,10 @@ classDiagram
     class Database {
         +database_url
         +pool: asyncpg.Pool?
+        -_instance: Database
+        -_instance_lock: threading.Lock
         -lifecycle_lock: asyncio.Lock
+        +get_instance(database_url, min_pool_size, max_pool_size)$ Database
         +connect()
         +disconnect()
         +get_pool()
@@ -82,18 +81,26 @@ classDiagram
         +fetch()
         +close()
     }
+    class ThreadLock {
+        +acquire()
+        +release()
+    }
+    class AsyncLock {
+        +acquire()
+        +release()
+    }
     class RequestDependencies {
         +get_pool(request)
     }
-    FastAPIApplication "1" *-- "1" Database : escopo de aplicação
+    FastAPIApplication --> Database : state.database
     Database "1" *-- "0..1" AsyncpgPool : ciclo de vida
+    Database ..> ThreadLock : sincroniza construção
+    Database ..> AsyncLock : sincroniza ciclo de vida
     RequestDependencies ..> Database : obtém de app.state
     RequestDependencies ..> AsyncpgPool : fornece às operações
 ```
 
-O diagrama mostra o recurso atualmente existente e o `lifecycle_lock` como melhoria opcional, não como implementação já presente. `asyncpg.Pool` oferece aquisição e liberação de conexões; veja a [documentação oficial de pools do asyncpg](https://magicstack.github.io/asyncpg/current/api/index.html#connection-pools).
-
-Se o time ainda quiser um Singleton por worker, ele deve ser descrito como **um `Database` por processo/event loop**, com trava síncrona para publicar/criar a instância em cenários multi-thread e trava assíncrona para serializar sua inicialização/encerramento. Isso não compartilha conexões entre processos e não parece trazer benefício sobre o escopo atual por aplicação.
+`asyncpg.Pool` oferece aquisição e liberação concorrente de conexões; veja a [documentação oficial de pools do asyncpg](https://magicstack.github.io/asyncpg/current/api/index.html#connection-pools).
 
 ## 7. Factory Method e Abstract Factory
 
@@ -200,7 +207,7 @@ Este desenho pressupõe contratos para todos os repositórios e implementações
 
 ## 8. Diagramas de classes dos padrões GoF presentes
 
-Os diagramas abaixo resumem os três padrões com uso claro na implementação atual. São diagramas conceituais; nomes e responsabilidades correspondem ao código, com alguns componentes externos simplificados.
+Os diagramas abaixo resumem os quatro padrões GoF com uso claro na implementação atual. São diagramas conceituais; nomes e responsabilidades correspondem ao código, com alguns componentes externos simplificados.
 
 ### Strategy — algoritmo de hash
 
@@ -281,7 +288,78 @@ classDiagram
     FetchAPI ..> PredictAIBackend : HTTP/JSON ou multipart
 ```
 
-## 9. Referências
+## 9. Diagramas dos padrões arquiteturais
+
+Os itens desta seção não são padrões GoF, mas são padrões arquiteturais identificados no código. Clean Architecture é uma organização por camadas e está descrita na seção 3; o diagrama de classes abaixo foca nos papéis de Repository, composição/injeção e DTO, que têm relações diretas entre tipos.
+
+### Repository e injeção de dependência
+
+```mermaid
+classDiagram
+    class IUserRepository {
+        <<Protocol>>
+        +get_by_email(email) User
+        +get_by_id(user_id) User
+        +add(user) User
+    }
+    class PostgresUserRepository {
+        -pool: asyncpg.Pool
+        +get_by_email(email) User
+        +get_by_id(user_id) User
+        +add(user) User
+    }
+    class CreateUser {
+        -repository: IUserRepository
+        -password_hasher: PasswordHasher
+        +execute(name, email, password, role) User
+    }
+    class HttpDependencies {
+        +get_pool(request) asyncpg.Pool
+        +get_user_repository(pool) IUserRepository
+        +get_create_user_use_case(repository, hasher) CreateUser
+    }
+    class Database {
+        +get_pool() asyncpg.Pool
+    }
+    IUserRepository <|.. PostgresUserRepository
+    CreateUser --> IUserRepository : depende da abstração
+    HttpDependencies ..> Database : resolve pool
+    HttpDependencies ..> PostgresUserRepository : compõe implementação
+    HttpDependencies ..> CreateUser : injeta dependências
+```
+
+### DTOs de entrada e saída HTTP
+
+```mermaid
+classDiagram
+    class UserCreate {
+        +name: str
+        +email: EmailStr
+        +password: str
+        +role: Literal
+    }
+    class UserUpdate {
+        +name: str?
+        +email: EmailStr?
+        +role: Literal?
+    }
+    class UserResponse {
+        +id: UUID
+        +name: str
+        +email: EmailStr
+        +role: Literal
+        +created_at: datetime
+    }
+    class UsersRouter {
+        +create_user(body: UserCreate) UserResponse
+        +update_user(body: UserUpdate) UserResponse
+    }
+    UsersRouter ..> UserCreate : valida requisição
+    UsersRouter ..> UserUpdate : valida atualização
+    UsersRouter ..> UserResponse : serializa resposta
+```
+
+## 10. Referências
 
 - Código de ciclo de vida: `backend/app/main.py`, `backend/app/infrastructure/database/postgres.py`, `backend/app/presentation/http/dependencies.py`.
 - API de pool asyncpg: [documentação oficial — Connection Pools](https://magicstack.github.io/asyncpg/current/api/index.html#connection-pools).
