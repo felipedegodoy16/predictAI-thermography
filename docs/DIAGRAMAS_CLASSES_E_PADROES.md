@@ -1,6 +1,6 @@
 # Diagramas de classes e design patterns
 
-Este documento registra a estrutura relevante do sistema implementada no repositório. O diagrama geral combina os módulos centrais do backend e os componentes frontend envolvidos nos padrões GoF. Em Python, os endpoints são funções organizadas em módulos; por isso aparecem como componentes `<<router>>`, não como classes literais.
+Este documento registra a estrutura relevante do sistema implementada no repositório. O diagrama de classes mostra somente o backend. Em Python, os endpoints são funções organizadas em módulos; por isso aparecem como componentes `<<router>>`, não como classes literais. O diagrama separado dos padrões inclui componentes frontend quando eles participam de um padrão implementado nessa camada.
 
 Os estereótipos `<<Strategy>>`, `<<Observer>>` e `<<Facade>>` destacam os padrões GoF identificados no código. `<<Repository>>`, `<<DI>>` e `<<DTO>>` indicam conceitos arquiteturais ou de transferência de dados, fora do catálogo GoF.
 
@@ -9,39 +9,6 @@ Os estereótipos `<<Strategy>>`, `<<Observer>>` e `<<Facade>>` destacam os padr�
 ```mermaid
 classDiagram
     direction LR
-
-    namespace Frontend {
-        class DashboardComponents {
-            <<UI>>
-            +renderPages()
-        }
-        class ApiFacade {
-            <<Facade>>
-            +request(path, options)
-            +listEquipments()
-            +uploadThermographicImage()
-            +createServiceOrder()
-        }
-        class AuthSessionStore {
-            +getAuthSession()
-            +saveAuthSession()
-            +clearAuthSession()
-        }
-        class ProfilePage {
-            +saveProfile()
-            +dispatchProfileUpdated()
-        }
-        class DashboardShell {
-            +subscribeProfileUpdated()
-            +refreshProfileName()
-        }
-        class WindowEventTarget {
-            <<event target>>
-            +dispatchEvent(event)
-            +addEventListener(type, callback)
-            +removeEventListener(type, callback)
-        }
-    }
 
     namespace Presentation {
         class AuthRouter {
@@ -241,15 +208,6 @@ classDiagram
         }
     }
 
-    DashboardComponents --> ApiFacade : operações de API
-    ApiFacade --> AuthSessionStore : sessão / renovação
-    ApiFacade --> AuthRouter : HTTP
-    ApiFacade --> EquipmentRouter : HTTP
-    ApiFacade --> ThermographicImagesRouter : HTTP
-    ApiFacade --> ServiceOrdersRouter : HTTP
-    ProfilePage ..> WindowEventTarget : publica evento
-    DashboardShell ..> WindowEventTarget : observa evento
-
     AuthRouter --> CreateUser : autenticação e cadastro
     AuthRouter --> AuthenticateUser : login
     UsersRouter --> UpdateUser : atualização de usuário
@@ -305,7 +263,7 @@ classDiagram
 
 ## Diagrama dos design patterns utilizados
 
-Este diagrama isola os três padrões GoF com evidência clara de uso no sistema. O Repository e a injeção de dependência aparecem como mecanismos arquiteturais auxiliares, identificados com estereótipos próprios.
+Este diagrama isola os padrões GoF com evidência clara de uso no sistema. Strategy está no backend; Observer e Facade estão no frontend. O Repository e a injeção de dependência aparecem como mecanismos arquiteturais auxiliares, identificados com estereótipos próprios.
 
 ```mermaid
 classDiagram
