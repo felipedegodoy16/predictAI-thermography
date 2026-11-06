@@ -209,7 +209,7 @@ function EquipmentCard({ equipment, types, onDetails, onEdit }: { equipment: Equ
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[11px]">
         {equipment.yellowLimitC !== null ? <EquipmentFact label="Alerta" value={`${equipment.yellowLimitC.toLocaleString("pt-BR")} °C`} /> : null}
-        {equipment.redLimitC !== null ? <EquipmentFact label="OS urgente" value={`${equipment.redLimitC.toLocaleString("pt-BR")} °C`} /> : null}
+        {equipment.redLimitC !== null ? <EquipmentFact label="Alarme" value={`${equipment.redLimitC.toLocaleString("pt-BR")} °C`} /> : null}
         {equipment.manualFileName ? <EquipmentFact label="Manual" value={equipment.manualFileName} /> : null}
         {equipment.assetTag ? <EquipmentFact label="Patrimônio" value={equipment.assetTag} /> : null}
         {equipment.location ? <EquipmentFact label="Local" value={equipment.location} /> : null}

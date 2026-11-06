@@ -182,7 +182,7 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
     : status === "ALERTA"
       ? "border-amber-200 bg-amber-50 text-amber-800"
       : "border-emerald-200 bg-emerald-50 text-emerald-800";
-  const statusLabel = status === "URGENTE" ? "Urgente" : status === "ALERTA" ? "Alerta" : "Dentro dos limites";
+  const statusLabel = status === "URGENTE" ? "Alarme" : status === "ALERTA" ? "Alerta" : "Dentro dos limites";
 
   function pointerPosition(event: PointerEvent<HTMLDivElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -309,7 +309,7 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
                   Criticidade térmica
                   <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "TODAS" | ThermographyStatus)} className="mt-1 min-h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-[11px] font-normal text-slate-700 outline-none focus:border-brand-primary">
                     <option value="TODAS">Todas</option>
-                    <option value="URGENTE">Urgente</option>
+                    <option value="URGENTE">Alarme</option>
                     <option value="ALERTA">Alerta</option>
                     <option value="NORMAL">Dentro dos limites</option>
                   </select>
@@ -358,29 +358,6 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
           </aside>
 
           <main className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-3.5 sm:p-4">
-              <div className="min-w-0">
-                <p className="text-[10px] font-medium text-slate-500">Data de inclusão no sistema</p>
-                <h2 className="truncate text-sm font-semibold text-slate-900">{formatDate(selectedImage.createdAt)}</h2>
-                <p className="mt-0.5 text-[11px] text-slate-500">{selectedImage.metadata.resolution.width} × {selectedImage.metadata.resolution.height} px · máxima {formatTemperature(selectedImage.metadata.statistics.max)} °C</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusStyle}`}>
-                  <Flame aria-hidden="true" className="mr-1 inline size-3.5" />{statusLabel}
-                </span>
-                <button
-                  type="button"
-                  disabled={!overlayUrl || selectMode}
-                  aria-pressed={overlayVisible}
-                  onClick={() => setOverlayVisible((visible) => !visible)}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-[11px] font-semibold text-slate-700 hover:border-brand-primary/40 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {overlayVisible ? <EyeOff aria-hidden="true" className="size-3.5" /> : <Eye aria-hidden="true" className="size-3.5" />}
-                  {overlayVisible ? "Ocultar termografia" : "Sobrepor termografia"}
-                </button>
-              </div>
-            </div>
-
             <div className="flex min-h-[42dvh] max-h-[72dvh] items-center justify-center overflow-hidden bg-slate-950 p-3 sm:min-h-[52dvh] sm:p-5">
               {imageLoading ? <div role="status" className="text-sm text-white/75">Carregando imagem…</div> : normalUrl ? (
                 <div
@@ -422,74 +399,95 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
                 </div>
               ) : <div role="alert" className="px-4 text-center text-sm text-rose-200">{error || "Imagem normal indisponível."}</div>}
             </div>
-            <p className="border-b border-slate-100 px-4 py-2 text-[10px] leading-4 text-slate-500">
-              {selectMode ? "A área tracejada azul indica onde existem dados térmicos. Somente os pixels dessa região entram na medição; qualquer parte da seleção fora dela será ignorada." : "O recorte e a posição da camada vêm das informações de registro visual do IS2. Diferenças de perspectiva entre as câmeras ainda podem alterar levemente a posição aparente dos objetos."}
-            </p>
 
-            <section className="border-b border-slate-100 p-4">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-800">Temperaturas da imagem</h3>
-                  <p className="mt-0.5 text-[10px] text-slate-500">Resumo calculado sobre os pixels térmicos válidos.</p>
+            <section className="space-y-4 border-b border-slate-100 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold text-slate-900" title={selectedImage.originalFileName}>{selectedImage.originalFileName}</h2>
+                  <p className="mt-1 text-[11px] text-slate-500">Incluída em {formatDate(selectedImage.createdAt)} · {selectedImage.metadata.resolution.width} × {selectedImage.metadata.resolution.height} px</p>
                 </div>
                 <button
                   type="button"
-                  disabled={!registration || !overlayUrl}
-                  aria-pressed={selectMode}
-                  onClick={() => {
-                    const next = !selectMode;
-                    setSelectMode(next);
-                    setOverlayVisible(next || overlayVisible);
-                    setRegion(null);
-                    setMeasurement(null);
-                    setRegionError("");
-                  }}
-                  className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${selectMode ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200 text-slate-700 hover:border-brand-primary/40 hover:bg-teal-50"}`}
+                  disabled={!overlayUrl || selectMode}
+                  aria-pressed={overlayVisible}
+                  onClick={() => setOverlayVisible((visible) => !visible)}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-[11px] font-semibold text-slate-700 hover:border-brand-primary/40 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {selectMode ? <X aria-hidden="true" className="size-3.5" /> : <Square aria-hidden="true" className="size-3.5" />}
-                  {selectMode ? "Cancelar seleção" : "Selecionar área térmica"}
+                  {overlayVisible ? <EyeOff aria-hidden="true" className="size-3.5" /> : <Eye aria-hidden="true" className="size-3.5" />}
+                  {overlayVisible ? "Ocultar termografia" : "Sobrepor termografia"}
                 </button>
               </div>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-                <Metric label="Temperatura máxima" value={`${formatTemperature(selectedImage.metadata.statistics.max)} °C`} />
-                <Metric label="Temperatura mínima" value={`${formatTemperature(selectedImage.metadata.statistics.min)} °C`} />
-                <Metric label="Temperatura média" value={`${formatTemperature(selectedImage.metadata.statistics.mean)} °C`} />
-              </dl>
-            </section>
+              <p className="text-[10px] leading-4 text-slate-500">
+                {selectMode ? "A área tracejada azul indica onde existem dados térmicos. Somente os pixels dessa região entram na medição; qualquer parte da seleção fora dela será ignorada." : "O recorte e a posição da camada vêm das informações de registro visual do IS2. Diferenças de perspectiva entre as câmeras ainda podem alterar levemente a posição aparente dos objetos."}
+              </p>
 
-            {selectMode || measurement || regionError ? (
-              <section className="space-y-3 p-4">
-                {selectMode ? <p className="text-[11px] leading-5 text-slate-600">Arraste o mouse ou o dedo sobre a imagem para desenhar um quadrado. A moldura vermelha marca a seleção; áreas sem informação térmica serão ignoradas.</p> : null}
-                {region && region.width > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={measureRegion} disabled={measuring || region.width < 2} className="inline-flex min-h-9 items-center justify-center rounded-lg bg-brand-primary px-3 text-[11px] font-semibold text-white hover:bg-brand-primary-hover disabled:cursor-not-allowed disabled:opacity-50">
-                      {measuring ? "Medindo…" : "Medir área selecionada"}
+              <section className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 sm:p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-semibold text-slate-800">Informações da análise</h3>
+                    <p className="mt-0.5 text-[10px] text-slate-500">Temperaturas e limites usados para classificar esta imagem.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusStyle}`}>
+                      <Flame aria-hidden="true" className="mr-1 inline size-3.5" />{statusLabel}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={!registration || !overlayUrl}
+                      aria-pressed={selectMode}
+                      onClick={() => {
+                        const next = !selectMode;
+                        setSelectMode(next);
+                        setOverlayVisible(next || overlayVisible);
+                        setRegion(null);
+                        setMeasurement(null);
+                        setRegionError("");
+                      }}
+                      className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${selectMode ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200 text-slate-700 hover:border-brand-primary/40 hover:bg-teal-50"}`}
+                    >
+                      {selectMode ? <X aria-hidden="true" className="size-3.5" /> : <Square aria-hidden="true" className="size-3.5" />}
+                      {selectMode ? "Cancelar seleção" : "Selecionar área térmica"}
                     </button>
-                    <button type="button" onClick={clearRegion} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-[11px] font-semibold text-slate-600 hover:bg-slate-50">Limpar área</button>
                   </div>
-                ) : null}
-                {regionError ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-800">{regionError}</p> : null}
-                {measurement ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50/60 p-3">
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                      <h4 className="text-xs font-semibold text-slate-800">Resultado da área selecionada</h4>
-                      <span className="text-[10px] font-medium text-slate-600">{measurement.thermalCoveragePercent.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% da seleção com dados térmicos · {measurement.thermalPixels.toLocaleString("pt-BR")} pixels</span>
-                    </div>
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-                      <Metric label="Máxima na área" value={`${formatTemperature(measurement.maximum)} °C`} />
-                      <Metric label="Mínima na área" value={`${formatTemperature(measurement.minimum)} °C`} />
-                      <Metric label="Média na área" value={`${formatTemperature(measurement.mean)} °C`} />
-                    </dl>
-                  </div>
-                ) : null}
+                </div>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 xl:grid-cols-5">
+                  <Metric label="Temperatura máxima" value={`${formatTemperature(selectedImage.metadata.statistics.max)} °C`} />
+                  <Metric label="Temperatura mínima" value={`${formatTemperature(selectedImage.metadata.statistics.min)} °C`} />
+                  <Metric label="Temperatura média" value={`${formatTemperature(selectedImage.metadata.statistics.mean)} °C`} />
+                  <Metric label="Limite de alerta" value={`${formatTemperature(selectedImage.metadata.limits_c.yellow)} °C`} />
+                  <Metric label="Limite do alarme" value={`${formatTemperature(selectedImage.metadata.limits_c.red)} °C`} />
+                </dl>
               </section>
-            ) : null}
 
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 p-4 text-xs sm:grid-cols-3">
-              <Metric label="Estado térmico" value={statusLabel} />
-              <Metric label="Limite de alerta" value={`${formatTemperature(selectedImage.metadata.limits_c.yellow)} °C`} />
-              <Metric label="Limite OS urgente" value={`${formatTemperature(selectedImage.metadata.limits_c.red)} °C`} />
-            </dl>
+              {selectMode || measurement || regionError ? (
+                <section className="space-y-3 rounded-xl border border-slate-200 p-4">
+                  {selectMode ? <p className="text-[11px] leading-5 text-slate-600">Arraste o mouse ou o dedo sobre a imagem para desenhar um quadrado. A moldura vermelha marca a seleção; áreas sem informação térmica serão ignoradas.</p> : null}
+                  {region && region.width > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={measureRegion} disabled={measuring || region.width < 2} className="inline-flex min-h-9 items-center justify-center rounded-lg bg-brand-primary px-3 text-[11px] font-semibold text-white hover:bg-brand-primary-hover disabled:cursor-not-allowed disabled:opacity-50">
+                        {measuring ? "Medindo…" : "Medir área selecionada"}
+                      </button>
+                      <button type="button" onClick={clearRegion} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-[11px] font-semibold text-slate-600 hover:bg-slate-50">Limpar área</button>
+                    </div>
+                  ) : null}
+                  {regionError ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-800">{regionError}</p> : null}
+                  {measurement ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50/60 p-3">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-xs font-semibold text-slate-800">Resultado da área selecionada</h4>
+                        <span className="text-[10px] font-medium text-slate-600">{measurement.thermalCoveragePercent.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% da seleção com dados térmicos · {measurement.thermalPixels.toLocaleString("pt-BR")} pixels</span>
+                      </div>
+                      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+                        <Metric label="Máxima na área" value={`${formatTemperature(measurement.maximum)} °C`} />
+                        <Metric label="Mínima na área" value={`${formatTemperature(measurement.minimum)} °C`} />
+                        <Metric label="Média na área" value={`${formatTemperature(measurement.mean)} °C`} />
+                      </dl>
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+
+            </section>
           </main>
         </div>
       ) : null}

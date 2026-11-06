@@ -1,19 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { FileImage, FileUp, Flame, ImageUp, X } from "lucide-react";
 import { toast } from "sonner";
-import { CreateOSModal } from "@/components/dashboard/service-orders/create-os-modal";
 import {
-  createServiceOrder,
   getThermographicImageAsset,
   listEquipments,
   listThermographicImages,
   uploadThermographicImage,
   type Equipment,
-  type EquipmentAdvice,
-  type ServiceOrderInput,
   type ThermographicImage,
 } from "@/lib/api";
 
@@ -21,7 +16,6 @@ const inputClass = "min-h-11 w-full rounded-lg border border-slate-200 bg-white 
 const manualUploadEnabled = process.env.NODE_ENV !== "production";
 
 export function ThermographicImagesPage() {
-  const router = useRouter();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [equipmentId, setEquipmentId] = useState("");
   const [images, setImages] = useState<ThermographicImage[]>([]);
@@ -31,7 +25,6 @@ export function ThermographicImagesPage() {
   const [loadingEquipment, setLoadingEquipment] = useState(true);
   const [loadingImages, setLoadingImages] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [serviceOrderDraft, setServiceOrderDraft] = useState<EquipmentAdvice | null>(null);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -108,10 +101,10 @@ export function ThermographicImagesPage() {
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       toast.success("Imagem termográfica processada e vinculada ao equipamento.");
-      if (result.serviceOrderDraft) {
-        setServiceOrderDraft(result.serviceOrderDraft);
-      } else if (result.serviceOrderError) {
-        toast.warning("Imagem salva, mas não foi possível gerar o rascunho da OS.", { description: result.serviceOrderError });
+      if (result.alarmEmailSent === true) {
+        toast.success("Alarme detectado. E-mail enviado aos administradores com as duas imagens.");
+      } else if (result.alarmEmailSent === false) {
+        toast.warning("Alarme detectado, mas o e-mail não pôde ser enviado. Verifique a configuração SMTP e os administradores cadastrados.");
       }
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Não foi possível processar o arquivo IS2.");
@@ -188,7 +181,7 @@ export function ThermographicImagesPage() {
                           <span className="mt-0.5 block truncate text-[10px] text-slate-500">{item.code} · {item.manufacturer ?? "Fabricante não informado"}</span>
                           <span className={`mt-1 block text-[10px] ${hasLimits ? "text-slate-600" : "font-medium text-amber-800"}`}>
                             {hasLimits
-                              ? `Alerta ${item.yellowLimitC?.toLocaleString("pt-BR")} °C · Urgente ${item.redLimitC?.toLocaleString("pt-BR")} °C`
+                            ? `Alerta ${item.yellowLimitC?.toLocaleString("pt-BR")} °C · Alarme ${item.redLimitC?.toLocaleString("pt-BR")} °C`
                               : "Configure os limites de temperatura"}
                           </span>
                         </span>
@@ -252,7 +245,7 @@ export function ThermographicImagesPage() {
             </button>
             {selectedEquipment && !selectedEquipmentHasLimits ? (
               <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 lg:col-span-2">
-                O equipamento <strong>{selectedEquipment.name}</strong> ainda não tem limites amarelo e vermelho. Configure-os no cadastro antes de enviar imagens.
+                O equipamento <strong>{selectedEquipment.name}</strong> ainda não tem os limites de alerta e alarme. Configure-os no cadastro antes de enviar imagens.
               </p>
             ) : null}
             {error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-800 lg:col-span-3">{error}</p> : null}
@@ -283,30 +276,13 @@ export function ThermographicImagesPage() {
           </section>
         </>
       )}
-      {serviceOrderDraft ? (
-        <CreateOSModal
-          initialDraft={serviceOrderDraft}
-          initialEquipmentId={Number(equipmentId)}
-          onClose={() => setServiceOrderDraft(null)}
-          onCreate={async (input: ServiceOrderInput) => {
-            try {
-              await createServiceOrder(input);
-              setServiceOrderDraft(null);
-              toast.success("Ordem de serviço criada.");
-              router.push("/kanban");
-            } catch (createError) {
-              toast.error(createError instanceof Error ? createError.message : "Não foi possível criar a ordem de serviço.");
-            }
-          }}
-        />
-      ) : null}
     </div>
   );
 }
 
 function ThermographicImageCard({ image, preview }: { image: ThermographicImage; preview?: { normal: string; thermal: string } }) {
   const status = image.metadata.thermal_status;
-  const statusLabel = status === "URGENTE" ? "Urgente · limite vermelho" : status === "ALERTA" ? "Alerta · limite amarelo" : "Dentro dos limites";
+  const statusLabel = status === "URGENTE" ? "Alarme · limite excedido" : status === "ALERTA" ? "Alerta · limite amarelo" : "Dentro dos limites";
   const statusStyle = status === "URGENTE" ? "border-rose-200 bg-rose-50 text-rose-800" : status === "ALERTA" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800";
 
   return (
@@ -338,7 +314,7 @@ function ThermographicImageCard({ image, preview }: { image: ThermographicImage;
         <Metric label="Refletida" value={`${formatTemperature(image.metadata.parameters.reflected_temp)} °C`} />
         <Metric label="Transmissão" value={image.metadata.parameters.transmission.toLocaleString("pt-BR")} />
         <Metric label="Limite amarelo" value={`${formatTemperature(image.metadata.limits_c.yellow)} °C`} />
-        <Metric label="Limite vermelho" value={`${formatTemperature(image.metadata.limits_c.red)} °C`} />
+        <Metric label="Limite do alarme" value={`${formatTemperature(image.metadata.limits_c.red)} °C`} />
       </dl>
     </article>
   );
