@@ -10,7 +10,6 @@
 | **Strategy** | Comportamental | `backend/app/application/ports/password_hasher.py`; `backend/app/infrastructure/security/argon2_password_hasher.py`; `backend/app/presentation/http/dependencies.py`; `backend/app/application/use_cases/users/create_user.py` e `authenticate_user.py` | `PasswordHasher` define o contrato para calcular e verificar hashes. `Argon2PasswordHasher` é a estratégia concreta usada pelos casos de uso de cadastro e autenticação. Os casos de uso dependem do contrato, então a implementação criptográfica pode ser substituída sem reescrever a regra de cadastro/login. | **Claro no desenho, com uma estratégia concreta em produção.** A troca da estratégia é feita pela composição/dependência, não por seleção dinâmica dentro do caso de uso. |
 | **Observer** | Comportamental | `frontend/components/dashboard/profile/profile-page.tsx` (publica `auth-profile-updated`); `frontend/components/dashboard/dashboard-shell.tsx` (assina o evento) | Depois que o perfil é atualizado, a tela publica um evento no `window`. O shell observa esse evento e atualiza o nome exibido na navegação. O emissor não chama diretamente o componente que precisa reagir. | **Uso localizado e explícito.** Há um evento e um consumidor conhecido; não existe um barramento geral de eventos no produto. |
 | **Facade** | Estrutural | `frontend/lib/api.ts`, especialmente `request<T>()` e as funções públicas por recurso | O módulo oferece às telas uma interface simples para chamar a API. Ele centraliza URL base, serialização, autenticação, renovação concorrente de sessão, repetição após 401, tratamento de erros e mapeamento das respostas. Os componentes chamam funções como `listEquipments` ou `uploadThermographicImage` sem duplicar o protocolo HTTP. | **Claro como fachada do cliente HTTP.** O arquivo também funciona como módulo de serviços/API client; Facade descreve o papel simplificador perante os componentes. |
-| **Singleton** | Criacional | `backend/app/infrastructure/database/postgres.py` (`Database.get_instance`) e `backend/app/main.py` (`create_app`) | A composição padrão da aplicação obtém um único `Database` por processo, responsável por criar e compartilhar o pool `asyncpg`. A construção do Singleton é protegida por `threading.Lock`; `connect()` e `disconnect()` usam um `asyncio.Lock` para serializar inicialização e encerramento concorrentes. | **Implementado no caminho de produção.** Aplicações de teste podem receber um `Database` explícito. Cada processo/worker tem seu próprio pool; não é Singleton distribuído. |
 
 ## 2. Usos parciais ou parecidos com GoF
 
@@ -18,6 +17,7 @@ Estes pontos têm semelhança com um padrão GoF, mas não devem ser tratados co
 
 | Conceito | Onde aparece | O que o código faz | Por que é parcial |
 |---|---|---|---|
+| **Singleton, escopo da aplicação (pool)** | `backend/app/main.py` e `backend/app/infrastructure/database/postgres.py` | Cada aplicação FastAPI mantém um `Database` em `application.state.database`; esse objeto cria e compartilha um único `asyncpg.Pool` entre as requisições durante seu ciclo de vida. Um `asyncio.Lock` serializa a inicialização e o encerramento do pool. | É um Singleton gerenciado no escopo da aplicação, não um Singleton global GoF: `create_app(database=...)` permite injeção, e cada worker/réplica tem seu próprio pool. A configuração `settings = Settings()` é compartilhada por import, mas não é o dono do pool. |
 | **Adapter, na integração Groq** | `backend/app/infrastructure/ai/groq_equipment_advisor.py` e endpoints de equipamento/termografia | O módulo monta requisições no formato Groq, chama HTTP, extrai JSON e entrega dados que os esquemas da aplicação validam como rascunho de OS. | A fronteira traduz formatos do provedor, lembrando Adapter. Porém, não há uma porta independente do fornecedor que defina o contrato esperado; os endpoints importam diretamente funções e configurações específicas da Groq. A integração continua acoplada ao provedor. |
 
 ## 3. Padrões arquiteturais presentes, mas fora do catálogo GoF
@@ -44,19 +44,15 @@ Essa lista não significa que o sistema deva implementar esses padrões. Ela ape
 
 ## 5. Resumo
 
-Os padrões GoF identificados são **Strategy** para hash de senha, **Observer** para sincronizar o nome do perfil no frontend, **Facade** para o cliente de API e **Singleton** para o proprietário do pool PostgreSQL. O restante da estrutura inclui padrões arquiteturais como Repository, injeção de dependência e separação em camadas.
+Os usos GoF mais consistentes são **Strategy** para a criptografia de senha, **Observer** para atualizar o nome do perfil entre componentes e **Facade** no cliente de API frontend. O pool do banco é compartilhado como Singleton no escopo de cada aplicação; Repository, injeção de dependência e separação em camadas são conceitos arquiteturais auxiliares.
 
-## 6. Singleton para conexão com o banco
+## 6. Singleton do pool do banco
 
-### Implementação e escopo
+O sistema usa um **Singleton com escopo da aplicação FastAPI** para o pool, sem impor uma variável global ao processo. `create_app()` constrói ou recebe uma instância `Database`, publica-a em `application.state.database`, e o `lifespan` chama `connect()` ao iniciar e `disconnect()` ao encerrar. As dependências das requisições recuperam sempre essa mesma instância e seu pool.
 
-`Database.get_instance()` mantém a instância de produção do proprietário do pool em nível de processo e rejeita uma segunda configuração divergente, em vez de conectar silenciosamente ao banco errado. `create_app(database=...)` continua aceitando uma instância explícita para testes e composições isoladas. O pool é aberto no `lifespan` e fechado no encerramento da aplicação.
+O recurso compartilhado é `asyncpg.Pool`, não uma conexão individual. O pool empresta conexões às operações concorrentes e limita a quantidade conforme `DATABASE_MAX_POOL_SIZE` (padrão atual 10 por instância). Os métodos `connect()` e `disconnect()` usam um `asyncio.Lock` da instância para que duas inicializações ou encerramentos concorrentes não criem, fechem ou publiquem pools duplicados. O lock não participa das consultas normais.
 
-O ciclo de vida padrão pressupõe uma aplicação FastAPI ativa por processo. Para executar aplicações isoladas simultaneamente no mesmo processo, injete uma instância `Database` própria em cada aplicação, evitando que o encerramento de uma delas feche o pool usado pela outra.
-
-O Singleton compartilha um **pool**, não uma conexão individual. O `asyncpg.Pool` empresta conexões para requisições concorrentes e limita o máximo conforme `DATABASE_MAX_POOL_SIZE` (padrão 10). Cada worker/processo mantém seu próprio Singleton e pool; não há compartilhamento entre processos, réplicas ou contêineres.
-
-`threading.Lock` protege a publicação da instância na criação concorrente. Um `asyncio.Lock` por `Database` cobre toda a sequência de verificação/criação e encerramento/limpeza, evitando que chamadas concorrentes a `connect()` abram pools duplicados ou que `connect()` e `disconnect()` alterem simultaneamente o estado do ciclo de vida. Consultas não adquirem esse lock: a concorrência de operações permanece a cargo do pool.
+O escopo é deliberado: cada worker/processo e cada réplica/container tem uma aplicação e um pool próprios. Um Singleton Python global não unificaria pools entre processos e poderia misturar configurações ou event loops. `create_app(database=...)` também mantém a capacidade de injetar outra instância, por exemplo, em testes.
 
 ```mermaid
 classDiagram
@@ -66,12 +62,10 @@ classDiagram
         +lifespan_stop()
     }
     class Database {
+        <<Singleton: escopo da aplicação>>
         +database_url
         +pool: asyncpg.Pool?
-        -_instance: Database
-        -_instance_lock: threading.Lock
-        -lifecycle_lock: asyncio.Lock
-        +get_instance(database_url, min_pool_size, max_pool_size)$ Database
+        -_lifecycle_lock: asyncio.Lock
         +connect()
         +disconnect()
         +get_pool()
@@ -81,26 +75,16 @@ classDiagram
         +fetch()
         +close()
     }
-    class ThreadLock {
-        +acquire()
-        +release()
-    }
-    class AsyncLock {
-        +acquire()
-        +release()
-    }
     class RequestDependencies {
         +get_pool(request)
     }
-    FastAPIApplication --> Database : state.database
+    FastAPIApplication "1" *-- "1" Database : escopo de aplicação
     Database "1" *-- "0..1" AsyncpgPool : ciclo de vida
-    Database ..> ThreadLock : sincroniza construção
-    Database ..> AsyncLock : sincroniza ciclo de vida
     RequestDependencies ..> Database : obtém de app.state
     RequestDependencies ..> AsyncpgPool : fornece às operações
 ```
 
-`asyncpg.Pool` oferece aquisição e liberação concorrente de conexões; veja a [documentação oficial de pools do asyncpg](https://magicstack.github.io/asyncpg/current/api/index.html#connection-pools).
+O `asyncio.Lock` agora faz parte da implementação e protege o ciclo de vida do pool. `asyncpg.Pool` oferece aquisição e liberação de conexões; veja a [documentação oficial de pools do asyncpg](https://magicstack.github.io/asyncpg/current/api/index.html#connection-pools).
 
 ## 7. Factory Method e Abstract Factory
 
@@ -207,7 +191,7 @@ Este desenho pressupõe contratos para todos os repositórios e implementações
 
 ## 8. Diagramas de classes dos padrões GoF presentes
 
-Os diagramas abaixo resumem os quatro padrões GoF com uso claro na implementação atual. São diagramas conceituais; nomes e responsabilidades correspondem ao código, com alguns componentes externos simplificados.
+Os diagramas abaixo resumem os três padrões com uso claro na implementação atual. São diagramas conceituais; nomes e responsabilidades correspondem ao código, com alguns componentes externos simplificados.
 
 ### Strategy — algoritmo de hash
 
@@ -360,7 +344,6 @@ classDiagram
 ```
 
 ## 10. Referências
-
 - Código de ciclo de vida: `backend/app/main.py`, `backend/app/infrastructure/database/postgres.py`, `backend/app/presentation/http/dependencies.py`.
 - API de pool asyncpg: [documentação oficial — Connection Pools](https://magicstack.github.io/asyncpg/current/api/index.html#connection-pools).
 - Processadores termográficos: `backend/app/infrastructure/thermography/termography_analysis.py` e `backend/app/presentation/http/thermographic_images.py`.

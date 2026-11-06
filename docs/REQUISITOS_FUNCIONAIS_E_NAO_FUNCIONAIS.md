@@ -1,7 +1,7 @@
 # Requisitos atuais — PredictAI Thermography
 
-- **Versão:** 0.3 — revisão baseada no código
-- **Data:** 04/11/2026
+- **Versão:** 0.4 — revisão baseada no código e alinhada à documentação de arquitetura
+- **Data:** 05/11/2026
 - **Status:** fotografia do comportamento encontrado no repositório; pendente de validação do Product Owner e da equipe técnica.
 
 ## 1. Objetivo e escopo
@@ -86,6 +86,15 @@ Os limites numéricos abaixo só são declarados quando encontrados no código. 
 | RNF-011 | A integração com IA deve manter credenciais no backend e validar saída estruturada. | Chave Groq vem de configuração do backend; resposta JSON é validada. Trechos do manual, relato e/ou termograma são transmitidos à Groq; política de privacidade/retenção precisa ser aprovada. |
 | RNF-012 | A interface deve funcionar em telas responsivas usadas no projeto. | Há layout adaptável e navegação móvel. Matriz de dispositivos, acessibilidade formal e condições de uso em campo não foram definidos. |
 | RNF-013 | O sistema deve atender metas de latência, disponibilidade, volume, recuperação e retenção adequadas ao contexto de operação. | Sem metas numéricas, carga de referência, SLA, RPO/RTO ou política aprovada nos artefatos atuais. Não há requisito verificável a registrar até essas metas serem definidas. |
+| RNF-014 | O backend deve manter responsabilidades identificáveis entre transporte HTTP, orquestração de aplicação, domínio e acesso a recursos externos, para facilitar evolução e manutenção. | Parcialmente atendido: há diretórios `presentation`, `application`, `domain` e `infrastructure`; usuários têm casos de uso explícitos e contrato `IUserRepository`. O pool asyncpg é compartilhado por aplicação e seu ciclo de vida é protegido contra inicialização/encerramento concorrentes. Em equipamento, termografia, OS e dashboard, vários endpoints chamam repositórios concretos diretamente, e parte das regras permanece nos routers. Não há critério de cobertura arquitetural aprovado. |
+
+### 4.1 Como interpretar a arquitetura nos requisitos
+
+Os RFs descrevem capacidades observáveis do produto. A separação em camadas e a divisão entre entidade (`User`) e caso de uso (`CreateUser`, `UpdateUser`) descrevem como partes do backend são organizadas para implementar essas capacidades; não criam funcionalidades visíveis ao usuário.
+
+No fluxo de cadastro, por exemplo, o RF-004 descreve a capacidade administrativa de criar uma conta. O endpoint HTTP valida a entrada e a permissão, `CreateUser` coordena a regra de cadastro, `IUserRepository` define a fronteira de persistência e `PostgresUserRepository` grava no banco. Nos fluxos em que não há caso de uso explícito, os requisitos continuam sendo os mesmos; muda a organização interna da implementação.
+
+O RNF-014 registra essa qualidade arquitetural como **parcial**, sem afirmar que todas as áreas já seguem a mesma separação. O diagrama de classes, a explicação das camadas e o fluxo de cadastro estão em [DIAGRAMAS_CLASSES_E_PADROES.md](DIAGRAMAS_CLASSES_E_PADROES.md). A análise de Strategy, Observer, Facade e dos padrões arquiteturais está em [DESIGN_PATTERNS.md](DESIGN_PATTERNS.md).
 
 ## 5. Critérios de aceite centrais do fluxo termográfico
 
@@ -115,6 +124,7 @@ Os limites numéricos abaixo só são declarados quando encontrados no código. 
 - **Equipamentos e manuais:** `backend/app/presentation/http/equipment.py`, esquemas/equipamento, repositório de equipamento e `frontend/components/dashboard/equipment/`.
 - **OS, usuários e dashboard:** `backend/app/presentation/http/`, `backend/app/domain/entity/service_order.py`, repositórios PostgreSQL e componentes `frontend/components/dashboard/service-orders/`, `users/` e dashboard.
 - **IA:** `backend/app/infrastructure/ai/groq_equipment_advisor.py` e configuração em `backend/app/core/config.py`.
+- **Arquitetura do backend e diagramas:** `docs/DIAGRAMAS_CLASSES_E_PADROES.md` (estrutura das camadas, fluxo de cadastro e diagramas); `docs/DESIGN_PATTERNS.md` (padrões identificados e distinção de conceitos arquiteturais).
 - **Requisitos anteriores e contexto do produto:** `docs/REQUISITOS_FUNCIONAIS_E_NAO_FUNCIONAIS.md` (esta revisão substitui o conteúdo anterior), `TAP_PredictAI_Thermography.docx` e `frontend/README.md`. Artefatos de skills legadas não foram tratados como requisitos aprovados.
 
 ## 8. Aprovação da baseline
