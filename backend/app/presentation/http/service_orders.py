@@ -12,6 +12,7 @@ from app.presentation.http.dependencies import (
     AuthenticatedUser,
     get_current_user,
     get_service_order_repository,
+    get_account_scope,
 )
 from app.presentation.schemas.service_orders import (
     ChecklistItemCreate,
@@ -40,8 +41,11 @@ Repository = Annotated[
     description="Cria uma OS e, opcionalmente, seus itens iniciais de checklist.",
 )
 async def create_service_order(
-    payload: ServiceOrderCreate, _: CurrentUser, repo: Repository
+    payload: ServiceOrderCreate, current_user: CurrentUser, repo: Repository,
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
 ) -> ServiceOrderResponse:
+    if account_id is None:
+        raise HTTPException(status_code=422, detail="Selecione uma conta antes de criar a ordem de serviço.")
     try:
         created = await repo.create(payload.model_dump())
     except Exception as error:

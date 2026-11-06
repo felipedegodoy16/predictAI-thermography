@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import asyncpg
 import httpx
@@ -20,6 +20,7 @@ from app.infrastructure.persistence.postgres_equipment_repository import (
 from app.presentation.http.dependencies import (
     AuthenticatedUser,
     get_current_user,
+    get_account_scope,
     get_equipment_repository,
 )
 from app.presentation.schemas.equipment import (
@@ -56,10 +57,13 @@ async def list_equipment_types(_: CurrentUser):
 )
 async def create_equipment(
     payload: Annotated[str, Form(...)],
-    _: CurrentUser,
+    current_user: CurrentUser,
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
     repository: Repository,
     manual: Annotated[UploadFile | None, File()] = None,
 ) -> EquipmentResponse:
+    if account_id is None:
+        raise HTTPException(status_code=422, detail="Selecione uma conta antes de cadastrar o equipamento.")
     try:
         equipment_payload = EquipmentCreate.model_validate_json(payload)
     except ValidationError as error:

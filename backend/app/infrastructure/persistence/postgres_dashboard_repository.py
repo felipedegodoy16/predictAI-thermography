@@ -1,11 +1,13 @@
 import asyncpg
+from uuid import UUID
 
 from app.domain.entity.service_order import ServiceOrderPriority, ServiceOrderStatus
 
 
 class PostgresDashboardRepository:
-    def __init__(self, pool: asyncpg.Pool) -> None:
+    def __init__(self, pool: asyncpg.Pool, *, account_id: UUID | None = None) -> None:
         self._pool = pool
+        self._account_id = account_id
 
     async def summary(self) -> dict[str, object]:
         totals = await self._pool.fetchrow(
@@ -19,15 +21,17 @@ class PostgresDashboardRepository:
                        WHERE due_at < NOW()
                          AND status NOT IN ('CONCLUIDO', 'CANCELADO')
                    ) AS overdue_orders
-               FROM service_orders"""
+               FROM service_orders
+               WHERE ($1::UUID IS NULL OR account_id = $1)""", self._account_id
         )
         status_rows = await self._pool.fetch(
-            "SELECT status, COUNT(*) AS count FROM service_orders GROUP BY status"
+            "SELECT status, COUNT(*) AS count FROM service_orders WHERE ($1::UUID IS NULL OR account_id = $1) GROUP BY status", self._account_id
         )
         priority_rows = await self._pool.fetch(
             """SELECT priority, COUNT(*) AS count FROM service_orders
                WHERE status NOT IN ('CONCLUIDO', 'CANCELADO')
-               GROUP BY priority"""
+                 AND ($1::UUID IS NULL OR account_id = $1)
+               GROUP BY priority""", self._account_id
         )
         month_rows = await self._pool.fetch(
             """WITH months AS (
@@ -40,11 +44,13 @@ class PostgresDashboardRepository:
                SELECT to_char(months.month, 'YYYY-MM') AS month,
                       (SELECT COUNT(*) FROM service_orders
                        WHERE created_at >= months.month
-                         AND created_at < months.month + INTERVAL '1 month') AS opened,
+                         AND created_at < months.month + INTERVAL '1 month'
+                         AND ($1::UUID IS NULL OR account_id = $1)) AS opened,
                       (SELECT COUNT(*) FROM service_orders
                        WHERE completed_at >= months.month
-                         AND completed_at < months.month + INTERVAL '1 month') AS completed
-               FROM months ORDER BY months.month"""
+                         AND completed_at < months.month + INTERVAL '1 month'
+                         AND ($1::UUID IS NULL OR account_id = $1)) AS completed
+               FROM months ORDER BY months.month""", self._account_id
         )
 
         by_status = {status: 0 for status in ServiceOrderStatus}
@@ -82,6 +88,7 @@ class PostgresDashboardRepository:
                    JOIN equipment ON equipment.id = images.equipment_id
                    WHERE equipment.yellow_limit_c IS NOT NULL
                      AND equipment.red_limit_c IS NOT NULL
+                     AND ($1::UUID IS NULL OR equipment.account_id = $1)
                )
                SELECT equipment_id,
                       equipment_code,
@@ -100,6 +107,6 @@ class PostgresDashboardRepository:
                ORDER BY red_alert_images DESC,
                         yellow_alert_images DESC,
                         equipment_name ASC,
-                        equipment_id ASC"""
+                        equipment_id ASC""", self._account_id
         )
         return [dict(row) for row in rows]

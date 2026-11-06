@@ -28,5 +28,6 @@ export function getAuthSession(): AuthSession | null {
 export function clearAuthSession(): void {
   if (typeof window !== "undefined") {
     window.sessionStorage.removeItem(SESSION_KEY);
+    window.sessionStorage.removeItem("predictai.account-scope");
   }
 }
