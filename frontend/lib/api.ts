@@ -4,6 +4,7 @@ import {
   saveAuthSession,
   type AuthSession,
 } from "@/lib/auth-session";
+import { getAccountScope } from "@/lib/account-scope";
 
 export interface TokenResponse {
   access_token: string;
@@ -22,7 +23,26 @@ export interface User {
   name: string;
   email: string;
   created_at: string;
-  role: "user" | "admin";
+  role: "user" | "admin" | "master_admin";
+  account_id?: string | null;
+  account_name?: string | null;
+}
+
+export interface Account {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+  user_count: number;
+  equipment_count: number;
+}
+
+export interface AccountCreateInput {
+  name: string;
+  admin_name: string;
+  admin_email: string;
+  admin_password: string;
 }
 
 export interface UserOption {
@@ -334,6 +354,8 @@ async function request<T>(
       throw new ApiError("Sua sessão expirou. Entre novamente.", 401);
     }
     headers.set("Authorization", `Bearer ${session.access_token}`);
+    const accountId = getAccountScope();
+    if (accountId) headers.set("X-Account-ID", accountId);
   }
 
   let response: Response;
@@ -359,6 +381,8 @@ async function request<T>(
     }
 
     headers.set("Authorization", `Bearer ${refreshedSession.access_token}`);
+    const accountId = getAccountScope();
+    if (accountId) headers.set("X-Account-ID", accountId);
     try {
       response = await fetch(API_BASE_URL + path, {
         method,
@@ -492,6 +516,14 @@ export function listUsers(params: {
 
 export function getMyUser(): Promise<User> {
   return request<User>("/users/me", { method: "GET", authenticated: true });
+}
+
+export function listAccounts(): Promise<Account[]> {
+  return request<Account[]>("/accounts", { method: "GET", authenticated: true });
+}
+
+export function createAccount(payload: AccountCreateInput): Promise<Account> {
+  return request<Account>("/accounts", { body: payload, authenticated: true });
 }
 
 export function listUserOptions(): Promise<UserOption[]> {
@@ -802,7 +834,7 @@ async function getAuthenticatedBlob(path: string, failureMessage: string): Promi
   let response: Response;
   try {
     response = await fetch(API_BASE_URL + path, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: accountHeaders(session.access_token),
       cache: "no-store",
     });
   } catch {
@@ -817,7 +849,7 @@ async function getAuthenticatedBlob(path: string, failureMessage: string): Promi
     session = refreshedSession;
     try {
       response = await fetch(API_BASE_URL + path, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: accountHeaders(session.access_token),
         cache: "no-store",
       });
     } catch {
@@ -829,6 +861,13 @@ async function getAuthenticatedBlob(path: string, failureMessage: string): Promi
     throw new ApiError(describeError(result?.detail), response.status);
   }
   return response.blob();
+}
+
+function accountHeaders(accessToken: string): Headers {
+  const headers = new Headers({ Authorization: `Bearer ${accessToken}` });
+  const accountId = getAccountScope();
+  if (accountId) headers.set("X-Account-ID", accountId);
+  return headers;
 }
 
 export async function getEquipmentAdvice(equipmentId: number, problem: string): Promise<EquipmentAdvice> {
@@ -870,7 +909,7 @@ export async function getEquipmentManual(equipmentId: number): Promise<Blob> {
   let response: Response;
   try {
     response = await fetch(API_BASE_URL + path, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: accountHeaders(session.access_token),
       cache: "no-store",
     });
   } catch {
@@ -886,7 +925,7 @@ export async function getEquipmentManual(equipmentId: number): Promise<Blob> {
     session = refreshedSession;
     try {
       response = await fetch(API_BASE_URL + path, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: accountHeaders(session.access_token),
         cache: "no-store",
       });
     } catch {

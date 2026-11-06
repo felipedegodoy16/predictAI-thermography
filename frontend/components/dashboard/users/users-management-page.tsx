@@ -29,7 +29,7 @@ export function UsersManagementPage() {
   const [editingUser, setEditingUser] = useState<User>();
   const [currentUser, setCurrentUser] = useState<User>();
   const [creating, setCreating] = useState(false);
-  const isAdmin = currentUser?.role === "admin";
+  const isAdmin = currentUser?.role === "admin" || currentUser?.role === "master_admin";
 
   useEffect(() => {
     let active = true;
@@ -39,7 +39,7 @@ export function UsersManagementPage() {
       void getMyUser()
         .then(async (me) => {
           if (active) setCurrentUser(me);
-          if (me.role === "admin") {
+          if (me.role === "admin" || me.role === "master_admin") {
             return listUsers({ limit: PAGE_SIZE, offset, search: query.trim() || undefined });
           }
           return [me];
@@ -174,8 +174,9 @@ export function UsersManagementPage() {
               </div>
               <div className="ml-11 mt-1.5 flex items-center gap-2 text-[10px] text-slate-500">
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
-                  {user.role === "admin" ? "Administrador" : "Usuário"}
+                  {user.role === "master_admin" ? "Master PredictAI" : user.role === "admin" ? "Administrador" : "Usuário"}
                 </span>
+                {user.account_name ? <span className="truncate">{user.account_name}</span> : null}
                 <span>{formatDate(user.created_at)}</span>
               </div>
             </article>
@@ -217,7 +218,8 @@ export function UsersManagementPage() {
                     </div>
                   </td>
                   <td className="px-3 py-3 text-[11px] text-slate-500">
-                    <span className="mr-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-600">{user.role === "admin" ? "Administrador" : "Usuário"}</span>
+                    <span className="mr-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-600">{user.role === "master_admin" ? "Master PredictAI" : user.role === "admin" ? "Administrador" : "Usuário"}</span>
+                    {user.account_name ? <span className="mr-2 text-slate-500">{user.account_name}</span> : null}
                     {formatDate(user.created_at)}
                   </td>
                   <td className="px-3 py-3 text-right">
@@ -296,7 +298,7 @@ export function UsersManagementPage() {
       {editingUser ? (
         <UserEditDrawer
           user={editingUser}
-          canChangeRole={isAdmin}
+          canChangeRole={isAdmin && editingUser.role !== "master_admin"}
           onClose={() => setEditingUser(undefined)}
           onSave={saveUser}
         />

@@ -171,7 +171,7 @@ async def upload_thermographic_image(
     response_data = dict(created)
     if maximum >= red_limit:
         try:
-            admin_emails = await user_repository.list_admin_emails()
+            admin_emails = await user_repository.list_admin_emails(account_id=equipment["account_id"])
             if admin_emails:
                 response_data["alarm_email_sent"] = await asyncio.to_thread(
                     send_thermal_alarm_email,

@@ -1,20 +1,23 @@
 import json
 from typing import Any
+from uuid import UUID
 
 import asyncpg
 
 
 class PostgresThermographicImageRepository:
-    def __init__(self, pool: asyncpg.Pool) -> None:
+    def __init__(self, pool: asyncpg.Pool, *, account_id: UUID | None = None) -> None:
         self._pool = pool
+        self._account_id = account_id
 
     async def create(self, payload: dict[str, Any]) -> dict[str, Any]:
         row = await self._pool.fetchrow(
             """INSERT INTO thermographic_images
                (equipment_id, original_file_name, temperature_matrix_file_name,
                 visible_image_file_name, thermal_image_file_name,
-                thermal_overlay_file_name, metadata_file_name, analysis_metadata)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+                thermal_overlay_file_name, metadata_file_name, analysis_metadata, account_id)
+               SELECT $1, $2, $3, $4, $5, $6, $7, $8::jsonb, equipment.account_id
+               FROM equipment WHERE equipment.id = $1 AND ($9::UUID IS NULL OR equipment.account_id = $9)
                RETURNING *""",
             payload["equipment_id"],
             payload["original_file_name"],
@@ -24,6 +27,7 @@ class PostgresThermographicImageRepository:
             payload["thermal_overlay_file_name"],
             payload["metadata_file_name"],
             json.dumps(payload["analysis_metadata"], ensure_ascii=False, allow_nan=False),
+            self._account_id,
         )
         created = await self.get(row["id"])
         if created is None:
@@ -35,8 +39,9 @@ class PostgresThermographicImageRepository:
             """SELECT images.*, equipment.name AS equipment_name
                FROM thermographic_images AS images
                JOIN equipment ON equipment.id = images.equipment_id
-               WHERE images.id = $1""",
+            WHERE images.id = $1 AND ($2::UUID IS NULL OR images.account_id = $2)""",
             image_id,
+            self._account_id,
         )
         return self._to_dict(row) if row else None
 
@@ -50,10 +55,11 @@ class PostgresThermographicImageRepository:
             """UPDATE thermographic_images
                SET thermal_overlay_file_name = $2,
                    analysis_metadata = $3::jsonb
-               WHERE id = $1""",
+               WHERE id = $1 AND ($4::UUID IS NULL OR account_id = $4)""",
             image_id,
             file_name,
             json.dumps(metadata, ensure_ascii=False, allow_nan=False),
+            self._account_id,
         )
 
     async def list(
@@ -67,9 +73,11 @@ class PostgresThermographicImageRepository:
             """SELECT images.*, equipment.name AS equipment_name
                FROM thermographic_images AS images
                JOIN equipment ON equipment.id = images.equipment_id
-               WHERE ($1::BIGINT IS NULL OR images.equipment_id = $1)
+               WHERE ($1::UUID IS NULL OR images.account_id = $1)
+                 AND ($2::BIGINT IS NULL OR images.equipment_id = $2)
                ORDER BY images.created_at DESC, images.id DESC
-               LIMIT $2 OFFSET $3""",
+               LIMIT $3 OFFSET $4""",
+            self._account_id,
             equipment_id,
             limit,
             offset,

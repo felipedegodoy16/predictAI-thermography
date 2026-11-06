@@ -29,13 +29,13 @@ export function UserEditDrawer({
   const [saveError, setSaveError] = useState<string>();
   const form = useForm<UserFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: user.name, email: user.email, role: user.role },
+    defaultValues: { name: user.name, email: user.email, role: user.role === "master_admin" ? "user" : user.role },
   });
 
   async function submit(values: UserFormValues) {
     setSaveError(undefined);
     try {
-      await onSave(values);
+      await onSave(canChangeRole ? values : { name: values.name, email: values.email });
     } catch (error) {
       setSaveError(
         error instanceof Error

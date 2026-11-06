@@ -10,8 +10,9 @@ from app.domain.entity.service_order import ServiceOrderStatus
 class PostgresServiceOrderRepository:
     """Persist service orders and their checklist items asynchronously."""
 
-    def __init__(self, pool: asyncpg.Pool) -> None:
+    def __init__(self, pool: asyncpg.Pool, *, account_id: UUID | None = None) -> None:
         self._pool = pool
+        self._account_id = account_id
 
     async def create(self, payload: dict[str, Any]) -> dict[str, Any]:
         async with self._pool.acquire() as conn, conn.transaction():
@@ -23,12 +24,12 @@ class PostgresServiceOrderRepository:
             row = await conn.fetchrow(
                 """INSERT INTO service_orders
                    (id, code, title, description, priority, client_id,
-                    technician_id, due_at, equipment_id)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    technician_id, due_at, equipment_id, account_id)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                    RETURNING *""",
                 service_order_id, code, payload["title"], payload["description"],
                 payload["priority"], payload["client_id"], payload.get("technician_id"),
-                payload.get("due_at"), payload.get("equipment_id"),
+                payload.get("due_at"), payload.get("equipment_id"), self._account_id,
             )
             await self._insert_items(conn, service_order_id, payload.get("checklist_items", []))
             return await self._get_with_connection(conn, row)
@@ -36,7 +37,7 @@ class PostgresServiceOrderRepository:
     async def get(self, service_order_id: int) -> dict[str, Any] | None:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT * FROM service_orders WHERE id = $1", service_order_id
+                "SELECT * FROM service_orders WHERE id = $1 AND ($2::UUID IS NULL OR account_id = $2)", service_order_id, self._account_id
             )
             return await self._get_with_connection(conn, row) if row else None
 
@@ -47,18 +48,19 @@ class PostgresServiceOrderRepository:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
                 """SELECT * FROM service_orders
-                   WHERE ($1::TEXT IS NULL OR status = $1)
-                     AND ($2::UUID IS NULL OR technician_id = $2)
-                     AND ($3::TEXT IS NULL OR priority = $3)
-                   ORDER BY created_at DESC, id DESC OFFSET $4 LIMIT $5""",
-                status.value if status else None, technician_id, priority, skip, limit,
+                   WHERE ($1::UUID IS NULL OR account_id = $1)
+                     AND ($2::TEXT IS NULL OR status = $2)
+                     AND ($3::UUID IS NULL OR technician_id = $3)
+                     AND ($4::TEXT IS NULL OR priority = $4)
+                   ORDER BY created_at DESC, id DESC OFFSET $5 LIMIT $6""",
+                self._account_id, status.value if status else None, technician_id, priority, skip, limit,
             )
             return [await self._get_with_connection(conn, row) for row in rows]
 
     async def kanban(self) -> dict[ServiceOrderStatus, list[dict[str, Any]]]:
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM service_orders ORDER BY created_at DESC, id DESC"
+                "SELECT * FROM service_orders WHERE ($1::UUID IS NULL OR account_id = $1) ORDER BY created_at DESC, id DESC", self._account_id
             )
             board = {value: [] for value in ServiceOrderStatus}
             for row in rows:
@@ -79,8 +81,8 @@ class PostgresServiceOrderRepository:
                 assignments.append(f"{field} = ${len(values)}")
         async with self._pool.acquire() as conn, conn.transaction():
             row = await conn.fetchrow(
-                f"UPDATE service_orders SET {', '.join(assignments)} WHERE id = $1 RETURNING *",
-                *values,
+                f"UPDATE service_orders SET {', '.join(assignments)} WHERE id = $1 AND (${len(values)+1}::UUID IS NULL OR account_id = ${len(values)+1}) RETURNING *",
+                *values, self._account_id,
             )
             return await self._get_with_connection(conn, row) if row else None
 
@@ -89,7 +91,7 @@ class PostgresServiceOrderRepository:
     ) -> dict[str, Any] | None:
         async with self._pool.acquire() as conn, conn.transaction():
             row = await conn.fetchrow(
-                "SELECT * FROM service_orders WHERE id = $1 FOR UPDATE", service_order_id
+                "SELECT * FROM service_orders WHERE id = $1 AND ($2::UUID IS NULL OR account_id = $2) FOR UPDATE", service_order_id, self._account_id
             )
             if row is None:
                 return None
@@ -106,8 +108,8 @@ class PostgresServiceOrderRepository:
                 """UPDATE service_orders SET status = $2::varchar,
                    completed_at = $3::timestamptz,
                    status_note = $4
-                   WHERE id = $1 RETURNING *""",
-                service_order_id, new_status.value, closed_at, reason,
+                   WHERE id = $1 AND ($5::UUID IS NULL OR account_id = $5) RETURNING *""",
+                service_order_id, new_status.value, closed_at, reason, self._account_id,
             )
             return await self._get_with_connection(conn, updated)
 
@@ -115,12 +117,12 @@ class PostgresServiceOrderRepository:
         self, service_order_id: int, items: list[dict[str, Any]]
     ) -> dict[str, Any] | None:
         async with self._pool.acquire() as conn, conn.transaction():
-            exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM service_orders WHERE id=$1)", service_order_id)
+            exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM service_orders WHERE id=$1 AND ($2::UUID IS NULL OR account_id=$2))", service_order_id, self._account_id)
             if not exists:
                 return None
             await self._insert_items(conn, service_order_id, items)
             return await self._get_with_connection(conn, await conn.fetchrow(
-                "SELECT * FROM service_orders WHERE id=$1", service_order_id
+                "SELECT * FROM service_orders WHERE id=$1 AND ($2::UUID IS NULL OR account_id=$2)", service_order_id, self._account_id
             ))
 
     async def update_checklist(
@@ -135,6 +137,12 @@ class PostgresServiceOrderRepository:
                 values.append(value)
                 sets.append(f"{field} = ${len(values)}")
         async with self._pool.acquire() as conn, conn.transaction():
+            scoped_order = await conn.fetchval(
+                "SELECT EXISTS(SELECT 1 FROM service_orders WHERE id=$1 AND ($2::UUID IS NULL OR account_id=$2))",
+                service_order_id, self._account_id,
+            )
+            if not scoped_order:
+                return None
             if sets:
                 row = await conn.fetchrow(
                     f"UPDATE checklist_items SET {', '.join(sets)} WHERE service_order_id=$1 AND id=$2 RETURNING id",
@@ -147,14 +155,17 @@ class PostgresServiceOrderRepository:
                 service_order_id, item_id,
             ):
                 return None
-            os_row = await conn.fetchrow("SELECT * FROM service_orders WHERE id=$1", service_order_id)
+            os_row = await conn.fetchrow("SELECT * FROM service_orders WHERE id=$1 AND ($2::UUID IS NULL OR account_id=$2)", service_order_id, self._account_id)
             return await self._get_with_connection(conn, os_row) if os_row else None
 
     async def delete_checklist(self, service_order_id: int, item_id: int) -> bool:
-        result = await self._pool.execute(
-            "DELETE FROM checklist_items WHERE service_order_id=$1 AND id=$2",
-            service_order_id, item_id,
-        )
+        async with self._pool.acquire() as conn:
+            result = await conn.execute(
+                """DELETE FROM checklist_items item USING service_orders so
+                   WHERE item.service_order_id=so.id AND so.id=$1 AND item.id=$2
+                     AND ($3::UUID IS NULL OR so.account_id=$3)""",
+                service_order_id, item_id, self._account_id,
+            )
         return result.endswith("1")
 
     @staticmethod

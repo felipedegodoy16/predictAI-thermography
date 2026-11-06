@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from app.application.ports.password_hasher import PasswordHasher
 from app.domain.entity.user import User
 from app.domain.exceptions.user import UserAlreadyExistsError
@@ -14,7 +16,8 @@ class CreateUser:
         self._password_hasher = password_hasher
 
     async def execute(
-        self, *, name: str, email: str, password: str, role: str = "user"
+        self, *, name: str, email: str, password: str,
+        account_id: UUID | None, role: str = "user",
     ) -> User:
         normalized_email = email.strip().casefold()
         if await self._repository.get_by_email(normalized_email) is not None:
@@ -25,5 +28,7 @@ class CreateUser:
             email=normalized_email,
             password_hash=self._password_hasher.hash(password),
             role=role,
+            account_id=account_id,
         )
         return await self._repository.add(user)
+from uuid import UUID
