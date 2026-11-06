@@ -77,7 +77,7 @@ export function EquipmentDetailDrawer({
               <h3 className="text-xs font-semibold text-slate-800">Dados do equipamento</h3>
               <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
                 <DetailFact label="Limite de alerta" value={formatLimit(equipment.yellowLimitC)} />
-                <DetailFact label="Limite para OS urgente" value={formatLimit(equipment.redLimitC)} />
+                <DetailFact label="Limite do alarme" value={formatLimit(equipment.redLimitC)} />
                 <DetailFact label="Criticidade" value={CRITICALITY_LABELS[equipment.criticality]} />
                 <DetailFact label="Patrimônio" value={equipment.assetTag} />
                 <DetailFact label="Fabricante" value={equipment.manufacturer} />

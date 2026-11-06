@@ -188,8 +188,7 @@ export interface ThermographicImage {
 
 export interface ThermographicImageUploadResult {
   image: ThermographicImage;
-  serviceOrderDraft?: EquipmentAdvice;
-  serviceOrderError?: string;
+  alarmEmailSent?: boolean | null;
 }
 
 export interface ThermographicRegionMeasurement {
@@ -736,11 +735,9 @@ export async function uploadThermographicImage(
     authenticated: true,
   });
   const response = result as Record<string, unknown>;
-  const draft = valueOf(response, "ordem_servico_rascunho", "service_order_draft");
   return {
     image: normalizeThermographicImage(result),
-    serviceOrderDraft: draft ? normalizeEquipmentAdvice(draft) : undefined,
-    serviceOrderError: (valueOf(response, "erro_geracao_os", "service_order_error") as string | null) ?? undefined,
+    alarmEmailSent: valueOf(response, "email_alarme_enviado", "alarm_email_sent") as boolean | null | undefined,
   };
 }
 

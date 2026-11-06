@@ -88,6 +88,19 @@ class PostgresUserRepository(IUserRepository):
             for row in rows
         ]
 
+    async def list_admin_emails(self) -> list[str]:
+        rows = await self._pool.fetch(
+            """
+            SELECT DISTINCT u.email
+            FROM users AS u
+            JOIN user_roles AS ur ON ur.user_id = u.id
+            JOIN roles AS r ON r.id = ur.role_id
+            WHERE r.code = 'admin'
+            ORDER BY u.email
+            """
+        )
+        return [row["email"] for row in rows]
+
     async def update_profile(
         self, *, user_id: UUID, name: str | None, email: str | None,
         role: str | None = None,

@@ -16,6 +16,8 @@ class IUserRepository(Protocol):
 
     async def list_user_options(self) -> list[UserOption]: ...
 
+    async def list_admin_emails(self) -> list[str]: ...
+
     async def update_profile(
         self, *, user_id: UUID, name: str | None, email: str | None,
         role: str | None = None,

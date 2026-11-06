@@ -94,7 +94,7 @@ export default function DashboardPage() {
                     <span className="mt-1 block font-mono text-[10px] text-slate-500">{item.equipmentCode}</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-2.5">
-                    {item.redAlertImages > 0 ? <span title={`${item.redAlertImages} imagens no limite vermelho`} className="flex size-9 items-center justify-center rounded-full bg-rose-600 text-xs font-bold tabular-nums text-white">{item.redAlertImages}</span> : null}
+                    {item.redAlertImages > 0 ? <span title={`${item.redAlertImages} imagens no limite do alarme`} className="flex size-9 items-center justify-center rounded-full bg-rose-600 text-xs font-bold tabular-nums text-white">{item.redAlertImages}</span> : null}
                     {item.yellowAlertImages > 0 ? <span title={`${item.yellowAlertImages} imagens no limite amarelo`} className="flex size-9 items-center justify-center rounded-full bg-amber-400 text-xs font-bold tabular-nums text-amber-950">{item.yellowAlertImages}</span> : null}
                   </span>
                 </Link>
