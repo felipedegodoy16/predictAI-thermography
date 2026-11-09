@@ -19,7 +19,7 @@ logging.basicConfig(
 
 
 def create_app(database: Database | None = None) -> FastAPI:
-    db = database or Database(
+    db = database if database is not None else Database.get_instance(
         settings.database_dsn,
         min_pool_size=settings.database_min_pool_size,
         max_pool_size=settings.database_max_pool_size,

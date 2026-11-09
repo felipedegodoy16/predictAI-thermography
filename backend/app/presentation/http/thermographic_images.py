@@ -10,8 +10,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import FileResponse
 
 from app.core.config import BACKEND_DIR, settings
-from app.infrastructure.ai.groq_equipment_advisor import get_thermographic_service_order_advice
 from app.infrastructure.persistence.postgres_equipment_repository import PostgresEquipmentRepository
+from app.infrastructure.email.thermal_alarm import send_thermal_alarm_email
 from app.infrastructure.persistence.postgres_thermographic_image_repository import (
     PostgresThermographicImageRepository,
 )
@@ -26,7 +26,9 @@ from app.presentation.http.dependencies import (
     get_current_user,
     get_equipment_repository,
     get_thermographic_image_repository,
+    get_user_repository,
 )
+from app.domain.repositories.user_repository import IUserRepository
 from app.presentation.schemas.thermographic_images import ThermographicImageResponse
 from app.presentation.schemas.thermographic_measurements import (
     ThermographicRegionMeasurementRequest,
@@ -47,6 +49,7 @@ EquipmentRepository = Annotated[
     PostgresEquipmentRepository,
     Depends(get_equipment_repository),
 ]
+UserRepository = Annotated[IUserRepository, Depends(get_user_repository)]
 
 
 @router.post(
@@ -59,6 +62,7 @@ async def upload_thermographic_image(
     _: CurrentUser,
     repository: Repository,
     equipment_repository: EquipmentRepository,
+    user_repository: UserRepository,
     equipment_id: Annotated[int, Form(alias="equipamento_id", gt=0)],
     file: Annotated[UploadFile, File(alias="arquivo")],
 ) -> ThermographicImageResponse:
@@ -165,68 +169,35 @@ async def upload_thermographic_image(
         red_limit,
     )
     response_data = dict(created)
-    if maximum >= yellow_limit:
-        api_key = settings.groq_api_key.get_secret_value()
-        if not api_key:
-            logger.warning(
-                "thermography.service_order_draft.failed reason=groq_not_configured equipment_id=%s image_id=%s",
-                equipment_id,
-                created["id"],
-            )
-            response_data["service_order_error"] = "A integração com a Groq ainda não está configurada no backend."
-        else:
-            manual_name = equipment.get("manual_file_name")
-            manual_path = BACKEND_DIR / "manual" / manual_name if manual_name and Path(manual_name).name == manual_name else None
-            equipment_description = ", ".join(
-                str(part) for part in (
-                    equipment.get("name"), equipment.get("manufacturer"),
-                    equipment.get("model"), equipment.get("serial_number"),
-                ) if part
-            )
-            logger.info(
-                "thermography.service_order_draft.started equipment_id=%s image_id=%s status=%s model=%s manual_available=%s",
-                equipment_id,
-                created["id"],
-                thermal_status,
-                settings.groq_vision_model,
-                bool(manual_path and manual_path.is_file()),
-            )
-            try:
-                draft = await get_thermographic_service_order_advice(
-                    api_key=api_key,
-                    model=settings.groq_vision_model,
-                    thermal_image_path=PROCESSED_DIR / processed.thermal_image_file_name,
-                    manual_path=manual_path,
-                    equipment_description=equipment_description,
-                    thermal_status=thermal_status,
+    if maximum >= red_limit:
+        try:
+            admin_emails = await user_repository.list_admin_emails(account_id=equipment["account_id"])
+            if admin_emails:
+                response_data["alarm_email_sent"] = await asyncio.to_thread(
+                    send_thermal_alarm_email,
+                    recipients=admin_emails,
+                    equipment_code=str(equipment.get("code", equipment_id)),
+                    equipment_name=str(equipment.get("name", "Equipamento")),
                     maximum_temperature=float(maximum),
-                    yellow_limit=yellow_limit,
-                    red_limit=red_limit,
+                    alarm_limit=red_limit,
+                    normal_image_path=PROCESSED_DIR / processed.visible_image_file_name,
+                    thermal_image_path=PROCESSED_DIR / processed.thermal_image_file_name,
+                    settings=settings,
                 )
-                response_data["service_order_draft"] = draft
-                logger.info(
-                    "thermography.service_order_draft.completed equipment_id=%s image_id=%s priority=%s checklist_count=%s",
+            else:
+                response_data["alarm_email_sent"] = False
+                logger.warning(
+                    "thermography.alarm_email.skipped reason=no_admin_recipients equipment_id=%s image_id=%s",
                     equipment_id,
                     created["id"],
-                    draft.get("priority", "unknown"),
-                    len(draft.get("checklist", [])),
                 )
-            except Exception:
-                logger.exception(
-                    "thermography.service_order_draft.failed equipment_id=%s image_id=%s model=%s",
-                    equipment_id,
-                    created["id"],
-                    settings.groq_vision_model,
-                )
-                response_data["service_order_error"] = "Não foi possível gerar o rascunho da OS com a Groq. A imagem foi salva; tente novamente."
-    else:
-        logger.info(
-            "thermography.service_order_draft.skipped reason=below_warning_limit equipment_id=%s image_id=%s max_c=%.2f yellow_limit_c=%.2f",
-            equipment_id,
-            created["id"],
-            float(maximum),
-            yellow_limit,
-        )
+        except Exception:
+            response_data["alarm_email_sent"] = False
+            logger.exception(
+                "thermography.alarm_email.failed equipment_id=%s image_id=%s",
+                equipment_id,
+                created["id"],
+            )
     return ThermographicImageResponse.model_validate(response_data)
 
 

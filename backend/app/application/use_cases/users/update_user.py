@@ -12,6 +12,7 @@ class UpdateUser:
         self,
         *,
         user_id: UUID,
+        account_id: UUID | None,
         name: str | None,
         email: str | None,
         role: str | None = None,
@@ -23,4 +24,5 @@ class UpdateUser:
             name=normalized_name,
             email=normalized_email,
             role=role,
+            account_id=account_id,
         )

@@ -122,12 +122,12 @@ export function EquipmentCreateDrawer({
 
             <fieldset className="space-y-3 rounded-xl border border-slate-200 p-3.5 sm:p-4">
               <legend className="px-1 text-xs font-semibold text-slate-700">Limites de temperatura para termografia</legend>
-              <p className="text-[11px] leading-5 text-slate-500">Defina os limites conforme o equipamento e o critério técnico adotado. O amarelo alerta o técnico; o vermelho indica abertura de OS urgente.</p>
+              <p className="text-[11px] leading-5 text-slate-500">Defina os limites conforme o equipamento e o critério técnico adotado. O amarelo alerta o técnico; ao atingir o alarme, os administradores recebem um e-mail com as imagens normal e termográfica. Nenhuma OS é aberta automaticamente.</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Alerta ao técnico" required unit="°C">
                   <input name="yellowLimitC" type="number" step="any" required inputMode="decimal" defaultValue={equipment?.yellowLimitC ?? ""} className={inputClass} />
                 </Field>
-                <Field label="Abertura de OS urgente" required unit="°C">
+                <Field label="Alarme" required unit="°C">
                   <input name="redLimitC" type="number" step="any" required inputMode="decimal" defaultValue={equipment?.redLimitC ?? ""} className={inputClass} />
                 </Field>
               </div>

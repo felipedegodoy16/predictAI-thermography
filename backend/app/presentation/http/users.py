@@ -13,6 +13,7 @@ from app.presentation.http.dependencies import (
     get_current_user,
     get_update_user_use_case,
     get_user_repository,
+    get_account_scope,
     require_permissions,
 )
 from app.presentation.schemas.users import (
@@ -34,13 +35,17 @@ router = APIRouter()
 async def create_user(
     payload: UserCreate,
     use_case: Annotated[CreateUser, Depends(get_create_user_use_case)],
-    _: Annotated[AuthenticatedUser, Depends(require_permissions("users:write"))],
+    current_user: Annotated[AuthenticatedUser, Depends(require_permissions("users:write"))],
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
 ) -> UserResponse:
+    if current_user.is_master and account_id is None:
+        raise HTTPException(status_code=422, detail="Selecione uma conta para cadastrar o usuário.")
     user = await use_case.execute(
         name=payload.name,
         email=str(payload.email),
         password=payload.password,
         role=payload.role,
+        account_id=account_id,
     )
     return UserResponse(
         id=user.id,
@@ -48,6 +53,8 @@ async def create_user(
         email=user.email,
         role=user.role,
         created_at=user.created_at,
+        account_id=user.account_id,
+        account_name=user.account_name,
     )
 
 
@@ -59,6 +66,7 @@ async def create_user(
 async def list_users(
     repository: Annotated[IUserRepository, Depends(get_user_repository)],
     _: Annotated[AuthenticatedUser, Depends(require_permissions("users:read"))],
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
     search: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
@@ -68,6 +76,7 @@ async def list_users(
         limit=limit,
         offset=offset,
         query=normalized_search,
+        account_id=account_id,
     )
     return [
         UserResponse(
@@ -76,6 +85,8 @@ async def list_users(
             email=user.email,
             role=user.role,
             created_at=user.created_at,
+            account_id=user.account_id,
+            account_name=user.account_name,
         )
         for user in users
     ]
@@ -89,8 +100,9 @@ async def list_users(
 async def list_user_options(
     repository: Annotated[IUserRepository, Depends(get_user_repository)],
     _: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
 ) -> list[UserOptionResponse]:
-    users = await repository.list_user_options()
+    users = await repository.list_user_options(account_id=account_id)
     return [UserOptionResponse(id=user.id, name=user.name, email=user.email) for user in users]
 
 
@@ -104,6 +116,8 @@ async def update_user(
     payload: UserUpdate,
     use_case: Annotated[UpdateUser, Depends(get_update_user_use_case)],
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
+    repository: Annotated[IUserRepository, Depends(get_user_repository)],
 ) -> UserResponse:
     is_admin = "users:write" in current_user.permissions
     if user_id != current_user.id and not is_admin:
@@ -113,6 +127,10 @@ async def update_user(
         )
     if payload.role is not None and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only administrators may change a user's type.")
+    if payload.role is not None:
+        target = await repository.get_by_id(user_id)
+        if target is not None and target.role == "master_admin":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="The platform master role cannot be changed here.")
     if not payload.model_fields_set:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -124,6 +142,7 @@ async def update_user(
         name=payload.name,
         email=str(payload.email) if payload.email is not None else None,
         role=payload.role,
+        account_id=account_id,
     )
     if user is None:
         raise HTTPException(
@@ -136,6 +155,8 @@ async def update_user(
         email=user.email,
         role=user.role,
         created_at=user.created_at,
+        account_id=user.account_id,
+        account_name=user.account_name,
     )
 
 
@@ -147,7 +168,7 @@ async def get_my_user(
     user = await repository.get_by_id(current_user.id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-    return UserResponse(id=user.id, name=user.name, email=user.email, role=user.role, created_at=user.created_at)
+    return UserResponse(id=user.id, name=user.name, email=user.email, role=user.role, created_at=user.created_at, account_id=user.account_id, account_name=user.account_name)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a user")
@@ -155,11 +176,12 @@ async def delete_user(
     user_id: UUID,
     current_user: Annotated[AuthenticatedUser, Depends(require_permissions("users:write"))],
     repository: Annotated[IUserRepository, Depends(get_user_repository)],
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
 ) -> None:
     if user_id == current_user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot delete your own account.")
     try:
-        deleted = await repository.delete(user_id=user_id)
+        deleted = await repository.delete(user_id=user_id, account_id=account_id)
     except asyncpg.ForeignKeyViolationError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

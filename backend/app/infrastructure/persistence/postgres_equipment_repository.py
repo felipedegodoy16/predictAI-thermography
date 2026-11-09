@@ -1,13 +1,15 @@
 import json
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
 import asyncpg
 
 
 class PostgresEquipmentRepository:
-    def __init__(self, pool: asyncpg.Pool) -> None:
+    def __init__(self, pool: asyncpg.Pool, *, account_id: UUID | None = None) -> None:
         self._pool = pool
+        self._account_id = account_id
 
     async def create(self, payload: dict[str, Any]) -> dict[str, Any]:
         async with self._pool.acquire() as connection, connection.transaction():
@@ -20,9 +22,9 @@ class PostgresEquipmentRepository:
                    (id, code, name, equipment_type, manufacturer,
                     yellow_limit_c, red_limit_c, model,
                     serial_number, asset_tag, location, criticality,
-                    installation_date, notes, specifications, manual_file_name)
+                    installation_date, notes, specifications, manual_file_name, account_id)
                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                           $12, $13, $14, $15::jsonb, $16)
+                           $12, $13, $14, $15::jsonb, $16, $17)
                    RETURNING *""",
                 equipment_id,
                 code,
@@ -40,12 +42,13 @@ class PostgresEquipmentRepository:
                 payload.get("notes"),
                 json.dumps({}),
                 payload.get("manual_file_name"),
+                self._account_id,
             )
             return self._to_dict(row)
 
     async def get(self, equipment_id: int) -> dict[str, Any] | None:
         row = await self._pool.fetchrow(
-            "SELECT * FROM equipment WHERE id = $1", equipment_id
+            "SELECT * FROM equipment WHERE id = $1 AND ($2::UUID IS NULL OR account_id = $2)", equipment_id, self._account_id
         )
         return self._to_dict(row) if row else None
 
@@ -64,7 +67,7 @@ class PostgresEquipmentRepository:
                    criticality = $11,
                    installation_date = $12,
                    notes = $13
-               WHERE id = $1
+               WHERE id = $1 AND ($14::UUID IS NULL OR account_id = $14)
                RETURNING *""",
             equipment_id,
             payload["name"],
@@ -79,6 +82,7 @@ class PostgresEquipmentRepository:
             payload["criticality"],
             payload.get("installation_date"),
             payload.get("notes"),
+            self._account_id,
         )
         return self._to_dict(row) if row else None
 
@@ -87,9 +91,11 @@ class PostgresEquipmentRepository:
     ) -> list[dict[str, Any]]:
         rows = await self._pool.fetch(
             """SELECT * FROM equipment
-               WHERE ($1::TEXT IS NULL OR equipment_type = $1)
+               WHERE ($1::UUID IS NULL OR account_id = $1)
+                 AND ($2::TEXT IS NULL OR equipment_type = $2)
                ORDER BY created_at DESC, id DESC
-               LIMIT $2 OFFSET $3""",
+               LIMIT $3 OFFSET $4""",
+            self._account_id,
             equipment_type,
             limit,
             offset,

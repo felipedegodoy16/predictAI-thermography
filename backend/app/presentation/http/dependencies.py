@@ -3,7 +3,7 @@ from typing import Annotated
 from uuid import UUID
 
 import asyncpg
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.application.ports.password_hasher import PasswordHasher
@@ -16,6 +16,7 @@ from app.infrastructure.security.access_tokens import verify_access_token
 from app.infrastructure.persistence.postgres_user_repository import (
     PostgresUserRepository,
 )
+from app.infrastructure.persistence.postgres_account_repository import PostgresAccountRepository
 from app.infrastructure.persistence.postgres_refresh_token_repository import (
     PostgresRefreshTokenRepository,
 )
@@ -40,7 +41,14 @@ bearer_scheme = HTTPBearer(auto_error=False)
 class AuthenticatedUser:
     id: UUID
     email: str
+    role: str
+    account_id: UUID | None
+    account_name: str | None
     permissions: frozenset[str]
+
+    @property
+    def is_master(self) -> bool:
+        return self.role == "master_admin"
 
 
 async def get_current_user(
@@ -63,9 +71,14 @@ async def get_current_user(
         user = await PostgresUserRepository(database.get_pool()).get_by_id(user_id)
         if user is None:
             raise ValueError("User no longer exists")
+        if user.role != "master_admin" and user.account_id is None:
+            raise ValueError("Account user has no account")
         return AuthenticatedUser(
             id=user.id,
             email=user.email,
+            role=user.role,
+            account_id=user.account_id,
+            account_name=user.account_name,
             permissions=frozenset(user.permissions),
         )
     except (ValueError, KeyError, TypeError):
@@ -78,7 +91,7 @@ def require_permissions(*required_permissions: str):
     async def permission_dependency(
         current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     ) -> AuthenticatedUser:
-        if not required.issubset(current_user.permissions):
+        if not current_user.is_master and not required.issubset(current_user.permissions):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to perform this action.",
@@ -93,10 +106,34 @@ def get_pool(request: Request) -> asyncpg.Pool:
     return database.get_pool()
 
 
+async def get_account_scope(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    pool: Annotated[asyncpg.Pool, Depends(get_pool)],
+    account_id: Annotated[UUID | None, Header(alias="X-Account-ID")] = None,
+) -> UUID | None:
+    if current_user.is_master:
+        if account_id is not None:
+            exists = await pool.fetchval(
+                "SELECT EXISTS(SELECT 1 FROM accounts WHERE id = $1 AND is_active)", account_id
+            )
+            if not exists:
+                raise HTTPException(status_code=404, detail="Conta não encontrada.")
+        return account_id
+    if account_id is not None and account_id != current_user.account_id:
+        raise HTTPException(status_code=403, detail="Acesso restrito à sua conta.")
+    return current_user.account_id
+
+
 def get_user_repository(
     pool: Annotated[asyncpg.Pool, Depends(get_pool)],
 ) -> IUserRepository:
     return PostgresUserRepository(pool)
+
+
+def get_account_repository(
+    pool: Annotated[asyncpg.Pool, Depends(get_pool)],
+) -> PostgresAccountRepository:
+    return PostgresAccountRepository(pool)
 
 
 def get_refresh_token_repository(
@@ -107,26 +144,30 @@ def get_refresh_token_repository(
 
 def get_service_order_repository(
     pool: Annotated[asyncpg.Pool, Depends(get_pool)],
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
 ) -> PostgresServiceOrderRepository:
-    return PostgresServiceOrderRepository(pool)
+    return PostgresServiceOrderRepository(pool, account_id=account_id)
 
 
 def get_equipment_repository(
     pool: Annotated[asyncpg.Pool, Depends(get_pool)],
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
 ) -> PostgresEquipmentRepository:
-    return PostgresEquipmentRepository(pool)
+    return PostgresEquipmentRepository(pool, account_id=account_id)
 
 
 def get_thermographic_image_repository(
     pool: Annotated[asyncpg.Pool, Depends(get_pool)],
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
 ) -> PostgresThermographicImageRepository:
-    return PostgresThermographicImageRepository(pool)
+    return PostgresThermographicImageRepository(pool, account_id=account_id)
 
 
 def get_dashboard_repository(
     pool: Annotated[asyncpg.Pool, Depends(get_pool)],
+    account_id: Annotated[UUID | None, Depends(get_account_scope)],
 ) -> PostgresDashboardRepository:
-    return PostgresDashboardRepository(pool)
+    return PostgresDashboardRepository(pool, account_id=account_id)
 
 
 def get_password_hasher() -> PasswordHasher:

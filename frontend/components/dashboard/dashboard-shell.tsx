@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Activity,
+  Building2,
   ChartNoAxesCombined,
   ClipboardList,
   LogOut,
@@ -15,8 +16,9 @@ import {
   X,
 } from "lucide-react";
 import { BrandLogo } from "@/components/auth/brand-logo";
-import { getMyUser } from "@/lib/api";
+import { getMyUser, listAccounts, type Account, type User } from "@/lib/api";
 import { clearAuthSession, getAuthSession } from "@/lib/auth-session";
+import { getAccountScope, setAccountScope } from "@/lib/account-scope";
 
 const navigation = [
   { label: "Dashboard", href: "/dashboard", icon: ChartNoAxesCombined },
@@ -32,6 +34,9 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [name, setName] = useState("");
   const [ready, setReady] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState(getAccountScope);
 
   useEffect(() => {
     const session = getAuthSession();
@@ -40,7 +45,11 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       return;
     }
     void getMyUser()
-      .then((user) => setName(user.name))
+      .then(async (profile) => {
+        setUser(profile);
+        setName(profile.name);
+        if (profile.role === "master_admin") setAccounts(await listAccounts());
+      })
       .catch(() => setName("Minha conta"));
     setReady(true);
   }, [router]);
@@ -59,8 +68,20 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
   function signOut() {
     clearAuthSession();
+    setAccountScope(null);
     router.replace("/login");
   }
+
+  function changeAccount(accountId: string) {
+    const value = accountId || null;
+    setAccountScope(value);
+    setSelectedAccount(value);
+    window.location.reload();
+  }
+
+  const visibleNavigation = user?.role === "master_admin"
+    ? [...navigation, { label: "Contas", href: "/contas", icon: Building2 }]
+    : navigation;
 
   const initials = name
     .split(/\s+/)
@@ -106,7 +127,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </button>
         </div>
         <nav aria-label="Navegação principal" className="mt-6 space-y-1.5">
-          {navigation.map(({ label, href, icon: Icon, testOnly }) => {
+          {visibleNavigation.map(({ label, href, icon: Icon, testOnly }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             const content = (
               <>
@@ -154,6 +175,15 @@ export function DashboardShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
+            {user?.role === "master_admin" ? (
+              <label className="hidden items-center gap-2 text-xs text-slate-500 md:flex">
+                <span>Conta</span>
+                <select aria-label="Selecionar conta" value={selectedAccount ?? ""} onChange={(event) => changeAccount(event.target.value)} className="max-w-52 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-medium text-slate-700">
+                  <option value="">Todas as contas</option>
+                  {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+                </select>
+              </label>
+            ) : user?.account_name ? <span className="hidden max-w-48 truncate rounded-lg bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-800 sm:block">{user.account_name}</span> : null}
             <Link
               href="/perfil"
               aria-label={`Abrir o perfil de ${name || "usuário"}`}

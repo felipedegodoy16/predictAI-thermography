@@ -272,8 +272,78 @@ classDiagram
     FetchAPI ..> PredictAIBackend : HTTP/JSON ou multipart
 ```
 
-## 9. Referências
+## 9. Diagramas dos padrões arquiteturais
 
+Os itens desta seção não são padrões GoF, mas são padrões arquiteturais identificados no código. Clean Architecture é uma organização por camadas e está descrita na seção 3; o diagrama de classes abaixo foca nos papéis de Repository, composição/injeção e DTO, que têm relações diretas entre tipos.
+
+### Repository e injeção de dependência
+
+```mermaid
+classDiagram
+    class IUserRepository {
+        <<Protocol>>
+        +get_by_email(email) User
+        +get_by_id(user_id) User
+        +add(user) User
+    }
+    class PostgresUserRepository {
+        -pool: asyncpg.Pool
+        +get_by_email(email) User
+        +get_by_id(user_id) User
+        +add(user) User
+    }
+    class CreateUser {
+        -repository: IUserRepository
+        -password_hasher: PasswordHasher
+        +execute(name, email, password, role) User
+    }
+    class HttpDependencies {
+        +get_pool(request) asyncpg.Pool
+        +get_user_repository(pool) IUserRepository
+        +get_create_user_use_case(repository, hasher) CreateUser
+    }
+    class Database {
+        +get_pool() asyncpg.Pool
+    }
+    IUserRepository <|.. PostgresUserRepository
+    CreateUser --> IUserRepository : depende da abstração
+    HttpDependencies ..> Database : resolve pool
+    HttpDependencies ..> PostgresUserRepository : compõe implementação
+    HttpDependencies ..> CreateUser : injeta dependências
+```
+
+### DTOs de entrada e saída HTTP
+
+```mermaid
+classDiagram
+    class UserCreate {
+        +name: str
+        +email: EmailStr
+        +password: str
+        +role: Literal
+    }
+    class UserUpdate {
+        +name: str?
+        +email: EmailStr?
+        +role: Literal?
+    }
+    class UserResponse {
+        +id: UUID
+        +name: str
+        +email: EmailStr
+        +role: Literal
+        +created_at: datetime
+    }
+    class UsersRouter {
+        +create_user(body: UserCreate) UserResponse
+        +update_user(body: UserUpdate) UserResponse
+    }
+    UsersRouter ..> UserCreate : valida requisição
+    UsersRouter ..> UserUpdate : valida atualização
+    UsersRouter ..> UserResponse : serializa resposta
+```
+
+## 10. Referências
 - Código de ciclo de vida: `backend/app/main.py`, `backend/app/infrastructure/database/postgres.py`, `backend/app/presentation/http/dependencies.py`.
 - API de pool asyncpg: [documentação oficial — Connection Pools](https://magicstack.github.io/asyncpg/current/api/index.html#connection-pools).
 - Processadores termográficos: `backend/app/infrastructure/thermography/termography_analysis.py` e `backend/app/presentation/http/thermographic_images.py`.

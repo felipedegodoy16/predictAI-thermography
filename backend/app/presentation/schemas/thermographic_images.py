@@ -3,8 +3,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.presentation.schemas.equipment_advice import EquipmentAdviceResponse
-
 
 class ThermographicImageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
@@ -20,5 +18,4 @@ class ThermographicImageResponse(BaseModel):
     metadata_file_name: str = Field(alias="arquivo_metadados")
     analysis_metadata: dict[str, Any] = Field(alias="metadados")
     created_at: datetime = Field(alias="data_criacao")
-    service_order_draft: EquipmentAdviceResponse | None = Field(default=None, alias="ordem_servico_rascunho")
-    service_order_error: str | None = Field(default=None, alias="erro_geracao_os")
+    alarm_email_sent: bool | None = Field(default=None, alias="email_alarme_enviado")

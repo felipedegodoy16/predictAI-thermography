@@ -50,8 +50,10 @@ class UserResponse(BaseModel):
     id: UUID
     name: str
     email: EmailStr
-    role: Literal["user", "admin"] = "user"
+    role: Literal["user", "admin", "master_admin"] = "user"
     created_at: datetime
+    account_id: UUID | None = None
+    account_name: str | None = None
 
 
 class UserOptionResponse(BaseModel):
