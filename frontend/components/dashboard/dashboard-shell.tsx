@@ -27,7 +27,6 @@ const navigation = [
   { label: "Equipamentos", href: "/equipamentos", icon: Wrench },
   { label: "Imagens termográficas", href: "/imagens-termograficas", icon: Images, testOnly: true },
   { label: "Usuários", href: "/usuarios", icon: UsersRound },
-  { label: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
 export function DashboardShell({ children }: { children: ReactNode }) {
@@ -81,9 +80,12 @@ export function DashboardShell({ children }: { children: ReactNode }) {
     window.location.reload();
   }
 
-  const visibleNavigation = user?.role === "master_admin"
-    ? [...navigation, { label: "Contas", href: "/contas", icon: Building2 }]
-    : navigation;
+  const visibleNavigation = [
+    ...(user?.role === "master_admin"
+      ? [...navigation, { label: "Contas", href: "/contas", icon: Building2 }]
+      : navigation),
+    { label: "Configurações", href: "/configuracoes", icon: Settings },
+  ];
 
   const initials = name
     .split(/\s+/)
