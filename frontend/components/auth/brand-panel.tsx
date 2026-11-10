@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  CalendarDays,
   Mail,
   Send,
   TrendingUp,
@@ -14,7 +13,7 @@ const copy: Record<AuthVariant, { title: string; description: string }> = {
   login: {
     title: "Manutenção inteligente para sua operação.",
     description:
-      "Planeje a manutenção preventiva, antecipe falhas com análises preditivas e organize os serviços corretivos em uma só plataforma.",
+      "Antecipe falhas com análises preditivas e organize os serviços corretivos em uma só plataforma.",
   },
   forgot: {
     title: "Esqueceu sua senha?",
@@ -29,11 +28,6 @@ const copy: Record<AuthVariant, { title: string; description: string }> = {
 };
 
 const benefits = [
-  {
-    icon: CalendarDays,
-    title: "Preventiva planejada",
-    description: "Inspeções e rotinas no prazo.",
-  },
   {
     icon: TrendingUp,
     title: "Preditiva por dados",
@@ -156,7 +150,7 @@ export function BrandPanel({ variant }: { variant: AuthVariant }) {
 
       <div className="relative z-10 mt-auto hidden pt-8 text-xs text-teal-50/65 lg:block">
         <BarChart3 aria-hidden="true" className="mr-2 inline size-4 text-teal-300" />
-        Corretiva, preventiva e preditiva em um só lugar.
+        Corretiva e preditiva em um só lugar.
       </div>
     </aside>
   );

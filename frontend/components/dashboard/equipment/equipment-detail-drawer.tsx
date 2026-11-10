@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Download, FileText, X } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 import { getEquipmentManual, type Equipment, type EquipmentTypeOption } from "@/lib/api";
 
 const CRITICALITY_LABELS = {
@@ -100,7 +101,7 @@ export function EquipmentDetailDrawer({
 
           <section className="flex min-h-[58dvh] flex-col p-3 sm:p-4 lg:min-h-0">
             {equipment.manualFileName ? manualLoading ? (
-              <div role="status" className="flex min-h-64 flex-1 items-center justify-center text-sm text-slate-500">Carregando manual…</div>
+              <div role="status" className="flex min-h-64 flex-1 items-center justify-center gap-2 text-sm text-slate-500"><LoadingSpinner /> Carregando manual…</div>
             ) : manualUrl ? (
               <iframe title={`Manual PDF de ${equipment.name}`} src={manualUrl} className="min-h-[64dvh] flex-1 rounded-lg border border-slate-200 lg:min-h-0" />
             ) : (

@@ -2,19 +2,22 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Building2, Plus } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 import { ApiError, createAccount, listAccounts, type Account } from "@/lib/api";
 
 export function AccountsManagementPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accountsError, setAccountsError] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   async function refresh() {
     setLoading(true);
+    setAccountsError("");
     try { setAccounts(await listAccounts()); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Não foi possível carregar as contas."); }
+    catch (reason) { setAccountsError(reason instanceof Error ? reason.message : "Não foi possível carregar as contas."); }
     finally { setLoading(false); }
   }
 
@@ -23,6 +26,7 @@ export function AccountsManagementPage() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true); setError(""); setSuccess("");
+    const formElement = event.currentTarget;
     const form = new FormData(event.currentTarget);
     try {
       const account = await createAccount({
@@ -32,7 +36,8 @@ export function AccountsManagementPage() {
         admin_password: String(form.get("admin_password") ?? ""),
       });
       setSuccess(`Conta ${account.name} e seu administrador foram cadastrados.`);
-      event.currentTarget.reset();
+      setError("");
+      formElement.reset();
       await refresh();
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : "Não foi possível cadastrar a conta.");
@@ -49,7 +54,8 @@ export function AccountsManagementPage() {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)]">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-slate-800">Contas cadastradas</h2>
-          {loading ? <p className="text-sm text-slate-500">Carregando...</p> : accounts.length ? (
+          {accountsError ? <p role="alert" className="mb-3 text-sm text-rose-700">{accountsError}</p> : null}
+          {loading ? <p role="status" className="flex items-center gap-2 text-sm text-slate-500"><LoadingSpinner /> Carregando...</p> : accounts.length ? (
             <div className="divide-y divide-slate-100">
               {accounts.map((account) => <article key={account.id} className="flex items-center gap-3 py-4 first:pt-0 last:pb-0">
                 <span className="flex size-10 items-center justify-center rounded-xl bg-teal-50 text-brand-primary"><Building2 className="size-5" /></span>
@@ -67,7 +73,7 @@ export function AccountsManagementPage() {
           <label className="block text-xs font-medium text-slate-600">Senha inicial<input name="admin_password" required minLength={12} maxLength={128} type="password" className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm" /><span className="mt-1 block text-[11px] font-normal text-slate-400">Mínimo de 12 caracteres.</span></label>
           {error ? <p role="alert" className="text-sm text-rose-700">{error}</p> : null}
           {success ? <p role="status" className="text-sm text-emerald-700">{success}</p> : null}
-          <button disabled={saving} className="h-10 rounded-lg bg-brand-primary px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{saving ? "Salvando..." : "Criar conta"}</button>
+          <button disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-primary px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60">{saving ? <><LoadingSpinner /> Salvando...</> : "Criar conta"}</button>
         </form>
       </div>
     </div>

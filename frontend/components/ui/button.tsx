@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { LoaderCircle } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 
 type ButtonVariant = "primary" | "outline" | "text";
 
@@ -39,7 +39,7 @@ export function Button({
       {...props}
     >
       {loading ? (
-        <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+        <LoadingSpinner />
       ) : null}
       {children}
     </button>

@@ -2,15 +2,18 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { AlertTriangle, CalendarClock, GripVertical, UserRound } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 import type { ServiceOrder } from "@/lib/api";
 import { formatDate, isLate, priorityDetails } from "./constants";
 
 export function ServiceOrderCard({
   order,
   onOpen,
+  saving = false,
 }: {
   order: ServiceOrder;
   onOpen: (order: ServiceOrder) => void;
+  saving?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: order.id,
@@ -39,6 +42,7 @@ export function ServiceOrderCard({
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-[11px] font-semibold tracking-tight text-slate-500">{order.code}</span>
         <div className="flex items-center gap-1.5">
+          {saving ? <span role="status" aria-label="Salvando etapa" className="text-brand-primary"><LoadingSpinner className="size-3.5" /></span> : null}
           <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${priority.className}`}>{priority.label}</span>
           <button
             type="button"

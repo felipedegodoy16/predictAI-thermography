@@ -11,10 +11,12 @@ export function KanbanColumn({
   column,
   orders,
   onOpen,
+  savingOrderId,
 }: {
   column: Column;
   orders: ServiceOrder[];
   onOpen: (order: ServiceOrder) => void;
+  savingOrderId: number | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { status: column.id satisfies ServiceOrderStatus } });
 
@@ -37,7 +39,7 @@ export function KanbanColumn({
 
       <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-0.5">
         {orders.length ? orders.map((order) => (
-          <ServiceOrderCard key={order.id} order={order} onOpen={onOpen} />
+          <ServiceOrderCard key={order.id} order={order} onOpen={onOpen} saving={savingOrderId === order.id} />
         )) : (
           <div className="flex min-h-28 items-center justify-center rounded-lg border border-dashed border-slate-300/90 px-4 text-center">
             <p className="text-[11px] text-slate-500">Nenhuma ordem nesta etapa</p>

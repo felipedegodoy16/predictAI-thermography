@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { LoadingSpinner } from "@/components/ui/loading";
 import { UserEditDrawer } from "@/components/dashboard/users/user-edit-drawer";
 import { UserCreateDrawer } from "@/components/dashboard/users/user-create-drawer";
 import {
@@ -29,6 +30,7 @@ export function UsersManagementPage() {
   const [editingUser, setEditingUser] = useState<User>();
   const [currentUser, setCurrentUser] = useState<User>();
   const [creating, setCreating] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string>();
   const isAdmin = currentUser?.role === "admin" || currentUser?.role === "master_admin";
 
   useEffect(() => {
@@ -85,12 +87,15 @@ export function UsersManagementPage() {
 
   async function removeUser(user: User) {
     if (!window.confirm(`Excluir o usuário ${user.name}?`)) return;
+    setDeletingUserId(user.id);
     try {
       await deleteUser(user.id);
       toast.success("Usuário excluído com sucesso.");
       setRefreshKey((current) => current + 1);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível excluir o usuário.");
+    } finally {
+      setDeletingUserId(undefined);
     }
   }
 
@@ -164,10 +169,11 @@ export function UsersManagementPage() {
                     <button
                       type="button"
                       onClick={() => void removeUser(user)}
+                      disabled={deletingUserId === user.id}
                       aria-label={`Excluir ${user.name}`}
                       className="flex size-10 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-600"
                     >
-                      <Trash2 aria-hidden="true" className="size-4" />
+                      {deletingUserId === user.id ? <LoadingSpinner /> : <Trash2 aria-hidden="true" className="size-4" />}
                     </button>
                   ) : null}
                 </div>
@@ -232,7 +238,7 @@ export function UsersManagementPage() {
                     >
                       <Pencil className="size-3.5" />
                     </button>
-                    {isAdmin && user.id !== currentUser?.id ? <button type="button" onClick={() => void removeUser(user)} aria-label={`Excluir ${user.name}`} title="Excluir usuário" className="rounded-md p-2 text-rose-600 transition hover:bg-rose-50"><Trash2 className="size-3.5" /></button> : null}
+                    {isAdmin && user.id !== currentUser?.id ? <button type="button" onClick={() => void removeUser(user)} disabled={deletingUserId === user.id} aria-label={`Excluir ${user.name}`} title="Excluir usuário" className="rounded-md p-2 text-rose-600 transition hover:bg-rose-50 disabled:opacity-50">{deletingUserId === user.id ? <LoadingSpinner className="size-3.5" /> : <Trash2 className="size-3.5" />}</button> : null}
                   </td>
                 </tr>
               ))}

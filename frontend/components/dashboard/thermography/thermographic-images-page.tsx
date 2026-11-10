@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { FileImage, FileUp, Flame, ImageUp, X } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 import { toast } from "sonner";
 import {
   getThermographicImageAsset,
@@ -241,7 +242,7 @@ export function ThermographicImagesPage() {
               </div>
             </div>
             <button type="submit" disabled={!equipmentId || !selectedEquipmentHasLimits || !file || uploading} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-brand-primary px-4 text-sm font-semibold text-white hover:bg-brand-primary-hover disabled:cursor-not-allowed disabled:opacity-50">
-              <ImageUp aria-hidden="true" className="size-4" />{uploading ? "Processando…" : "Enviar e analisar"}
+              {uploading ? <LoadingSpinner /> : <ImageUp aria-hidden="true" className="size-4" />}{uploading ? "Processando…" : "Enviar e analisar"}
             </button>
             {selectedEquipment && !selectedEquipmentHasLimits ? (
               <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 lg:col-span-2">

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     template: "%s | PredictAI",
   },
   description:
-    "Gestão de manutenção corretiva, preventiva e preditiva para operações industriais.",
+    "Gestão de manutenção corretiva e preditiva para operações industriais.",
 };
 
 export default function RootLayout({

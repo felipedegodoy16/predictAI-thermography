@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { AuthHeading } from "@/components/auth/auth-heading";
 import { Button } from "@/components/ui/button";
 import { FormError, FormField } from "@/components/ui/form-field";
+import { LoadingOverlay } from "@/components/ui/loading";
 import { ApiError, login } from "@/lib/api";
 import { saveAuthSession } from "@/lib/auth-session";
 import { loginSchema, type LoginFormValues } from "@/lib/validators";
@@ -130,6 +131,7 @@ export function LoginForm() {
           ) : null}
         </Button>
       </form>
+      {isSubmitting ? <LoadingOverlay message="Validando seus dados…" /> : null}
 
       <div className="my-6 flex items-center gap-3 text-xs text-slate-400">
         <span className="h-px flex-1 bg-slate-200" />

@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { CalendarDays, Save, ShieldCheck, UserRound } from "lucide-react";
 import { FormField } from "@/components/ui/form-field";
+import { LoadingSpinner } from "@/components/ui/loading";
 import { getMyUser, updateUser, type User } from "@/lib/api";
 import { getAuthSession, saveAuthSession } from "@/lib/auth-session";
 
@@ -138,7 +139,7 @@ export function ProfilePage() {
                   disabled={isSubmitting || !isDirty}
                   className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-primary px-4 text-xs font-semibold text-white transition hover:bg-brand-primary-hover disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
-                  <Save aria-hidden="true" className="size-3.5" />
+                  {isSubmitting ? <LoadingSpinner /> : <Save aria-hidden="true" className="size-3.5" />}
                   {isSubmitting ? "Salvando…" : "Salvar alterações"}
                 </button>
               </div>

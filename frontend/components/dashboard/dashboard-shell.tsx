@@ -155,7 +155,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </span>
           <h2 className="text-xs font-semibold text-white">Manutenção em um só lugar</h2>
           <p className="mt-1 text-[11px] leading-4 text-teal-100/80">
-            Organize atividades corretivas, preventivas e preditivas da operação.
+            Organize atividades corretivas e preditivas da operação.
           </p>
         </section>
       </aside>

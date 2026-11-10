@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { X } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 import type { UserCreateInput } from "@/lib/api";
 
 const schema = z.object({
@@ -48,7 +49,7 @@ export function UserCreateDrawer({ onClose, onSave }: {
         </div>
         <footer className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={form.formState.isSubmitting} className="min-h-10 rounded-lg border border-slate-200 px-4 text-xs font-medium text-slate-600">Cancelar</button>
-          <button type="submit" disabled={form.formState.isSubmitting} className="min-h-10 rounded-lg bg-brand-primary px-4 text-xs font-semibold text-white disabled:opacity-60">{form.formState.isSubmitting ? "Cadastrando…" : "Cadastrar usuário"}</button>
+          <button type="submit" disabled={form.formState.isSubmitting} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand-primary px-4 text-xs font-semibold text-white disabled:opacity-60">{form.formState.isSubmitting ? <><LoadingSpinner /> Cadastrando…</> : "Cadastrar usuário"}</button>
         </footer>
       </form>
     </aside>

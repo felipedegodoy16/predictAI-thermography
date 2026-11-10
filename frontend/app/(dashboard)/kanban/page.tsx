@@ -58,6 +58,7 @@ function orderIsVisible(order: ServiceOrder, search: string, technician: string,
 export default function KanbanPage() {
   const [board, setBoard] = useState<Board>(emptyBoard);
   const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
+  const [savingOrderId, setSavingOrderId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -125,6 +126,7 @@ export default function KanbanPage() {
     }
 
     const previousBoard = board;
+    setSavingOrderId(orderId);
     setBoard((current) => ({
       ...current,
       [currentStatus]: current[currentStatus].filter((item) => item.id !== orderId),
@@ -142,6 +144,8 @@ export default function KanbanPage() {
     } catch (error) {
       setBoard(previousBoard);
       toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o status. A ordem voltou à etapa anterior.");
+    } finally {
+      setSavingOrderId(null);
     }
   }
 
@@ -251,7 +255,7 @@ export default function KanbanPage() {
           <div className="px-4 py-10 text-center sm:px-5 sm:py-16">
             <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-teal-50 text-brand-primary"><ClipboardList className="size-6" /></span>
             <h3 className="mt-4 text-sm font-semibold text-slate-800">Seu quadro está pronto para receber ordens</h3>
-            <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-slate-500">Cadastre a primeira ordem de serviço para organizar as atividades corretivas, preventivas e preditivas da equipe.</p>
+            <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 text-slate-500">Cadastre a primeira ordem de serviço para organizar as atividades corretivas e preditivas da equipe.</p>
             <button type="button" onClick={() => setCreateOpen(true)} className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand-primary px-4 text-xs font-semibold text-white hover:bg-brand-primary-hover"><Plus className="size-4" /> Criar primeira ordem</button>
           </div>
         ) : (
@@ -263,6 +267,7 @@ export default function KanbanPage() {
                   column={column}
                   orders={filteredOrders(column.id)}
                   onOpen={setSelectedOrder}
+                  savingOrderId={savingOrderId}
                 />
               ))}
             </div>

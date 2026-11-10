@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { ArrowLeft, ChevronDown, Eye, EyeOff, Flame, Image, Square, Thermometer, X } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 import {
   getThermographicImageAsset,
   listEquipments,
@@ -270,7 +271,7 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
       {error && !selectedImage ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-800">{error}</p> : null}
 
       {loading ? (
-        <div role="status" className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Carregando histórico…</div>
+        <div role="status" className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500"><LoadingSpinner /> Carregando histórico…</div>
       ) : images.length === 0 && equipment ? (
         <section className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-12 text-center">
           <Thermometer aria-hidden="true" className="mx-auto size-8 text-slate-400" />
@@ -284,7 +285,7 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
           <h2 className="mt-3 text-sm font-semibold text-slate-800">Nenhuma imagem encontrada</h2>
           <p className="mt-1 text-xs text-slate-500">Ajuste o período ou a criticidade para ver outros registros.</p>
           <button type="button" onClick={() => { setDateFrom(""); setDateTo(""); setStatusFilter("TODAS"); }} className="mt-4 inline-flex min-h-9 items-center rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50">Limpar filtros</button>
-          {hasMoreImages ? <button type="button" onClick={() => void loadMoreImages()} disabled={loadingMoreImages} className="ml-2 mt-4 inline-flex min-h-9 items-center rounded-lg bg-brand-primary px-3 text-xs font-semibold text-white hover:bg-brand-primary-hover disabled:opacity-60">{loadingMoreImages ? "Carregando…" : "Carregar mais imagens"}</button> : null}
+          {hasMoreImages ? <button type="button" onClick={() => void loadMoreImages()} disabled={loadingMoreImages} className="ml-2 mt-4 inline-flex min-h-9 items-center gap-2 rounded-lg bg-brand-primary px-3 text-xs font-semibold text-white hover:bg-brand-primary-hover disabled:opacity-60">{loadingMoreImages ? <><LoadingSpinner /> Carregando imagens…</> : "Carregar mais imagens"}</button> : null}
         </section>
       ) : selectedImage ? (
         <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
@@ -351,7 +352,7 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
             {hasMoreImages ? (
               <div className="border-t border-slate-100 p-2.5">
                 <button type="button" onClick={() => void loadMoreImages()} disabled={loadingMoreImages} className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-slate-200 px-3 text-[11px] font-semibold text-slate-700 hover:border-brand-primary/40 hover:bg-teal-50 disabled:cursor-wait disabled:opacity-60">
-                  {loadingMoreImages ? "Carregando imagens…" : "Carregar mais imagens"}
+                  {loadingMoreImages ? <span className="inline-flex items-center gap-2"><LoadingSpinner /> Carregando imagens…</span> : "Carregar mais imagens"}
                 </button>
               </div>
             ) : null}
@@ -359,7 +360,7 @@ export function EquipmentThermographicHistoryPage({ equipmentId }: { equipmentId
 
           <main className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="flex min-h-[42dvh] max-h-[72dvh] items-center justify-center overflow-hidden bg-slate-950 p-3 sm:min-h-[52dvh] sm:p-5">
-              {imageLoading ? <div role="status" className="text-sm text-white/75">Carregando imagem…</div> : normalUrl ? (
+              {imageLoading ? <div role="status" className="flex items-center gap-2 text-sm text-white/75"><LoadingSpinner /> Carregando imagem…</div> : normalUrl ? (
                 <div
                   ref={stageRef}
                   className={`relative max-h-[68dvh] shrink-0 touch-none ${selectMode ? "cursor-crosshair" : ""}`}

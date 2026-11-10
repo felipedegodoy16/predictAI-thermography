@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { FileUp, X } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 import { createEquipment, updateEquipment, type Equipment, type EquipmentCriticality, type EquipmentInput, type EquipmentTypeOption } from "@/lib/api";
 
 const inputClass = "min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10";
@@ -157,7 +158,7 @@ export function EquipmentCreateDrawer({
           <footer className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-white p-4 sm:flex-row sm:justify-end sm:px-6">
             <button type="button" onClick={onClose} disabled={saving} className="min-h-11 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
             <button type="submit" disabled={saving || types.length === 0} className="min-h-11 rounded-lg bg-brand-primary px-5 text-sm font-semibold text-white hover:bg-brand-primary-hover disabled:opacity-60">
-              {saving ? "Salvando…" : editing ? "Salvar alterações" : "Salvar equipamento"}
+              {saving ? <span className="inline-flex items-center gap-2"><LoadingSpinner /> Salvando…</span> : editing ? "Salvar alterações" : "Salvar equipamento"}
             </button>
           </footer>
         </form>

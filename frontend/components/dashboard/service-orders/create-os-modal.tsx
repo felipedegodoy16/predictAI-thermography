@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { FileText, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 import { getEquipmentAdvice, listEquipments, listUserOptions, type Equipment, type EquipmentAdvice, type ServiceOrderInput, type UserOption } from "@/lib/api";
 import { PRIORITIES } from "./constants";
 
@@ -205,7 +206,7 @@ export function CreateOSModal({
                   <label htmlFor="os-problem" className="block text-[11px] font-medium text-slate-600">Problema observado</label>
                   <textarea id="os-problem" value={problem} onChange={(event) => { setProblem(event.target.value); setAdviceApplied(false); setAdviceChecklistCount(0); }} rows={2} maxLength={4000} placeholder="Ex.: o motor está vibrando e aquecendo acima do normal." className={inputClass + " resize-y"} />
                   <button type="button" onClick={() => void requestAdvice()} disabled={adviceLoading || problem.trim().length < 5} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-brand-primary/20 bg-white px-3 text-xs font-semibold text-brand-primary hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50">
-                    {adviceLoading ? <span className="size-3.5 animate-spin rounded-full border-2 border-brand-primary/25 border-t-brand-primary" /> : <Sparkles aria-hidden="true" className="size-3.5" />}
+                    {adviceLoading ? <LoadingSpinner className="size-3.5" /> : <Sparkles aria-hidden="true" className="size-3.5" />}
                     {adviceLoading ? "Consultando manual…" : "Consultar manual com IA"}
                   </button>
                   <p className="text-[10px] leading-4 text-slate-500">Orientação baseada no manual e no relato; revise com um profissional antes de executar.</p>
@@ -220,7 +221,7 @@ export function CreateOSModal({
 
             <div>
               <label htmlFor="os-title" className="mb-1.5 block text-xs font-semibold text-slate-700">Título da atividade</label>
-              <input id="os-title" autoFocus placeholder="Ex.: Inspeção preventiva da bomba principal" {...form.register("title")} className={inputClass} />
+              <input id="os-title" autoFocus placeholder="Ex.: Reparo do motor da bomba principal" {...form.register("title")} className={inputClass} />
               {form.formState.errors.title ? <p role="alert" className="mt-1 text-xs text-rose-600">{form.formState.errors.title.message}</p> : null}
             </div>
 
@@ -320,7 +321,7 @@ export function CreateOSModal({
           <footer className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
             <button type="button" disabled={form.formState.isSubmitting} onClick={onClose} className="min-h-11 rounded-lg border border-slate-200 px-5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
             <button type="submit" disabled={form.formState.isSubmitting} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-brand-primary px-5 text-xs font-semibold text-white shadow-sm hover:bg-brand-primary-hover disabled:opacity-60">
-              {form.formState.isSubmitting ? <span className="size-4 animate-spin rounded-full border-2 border-white/35 border-t-white" /> : <Plus className="size-4" />}
+              {form.formState.isSubmitting ? <LoadingSpinner /> : <Plus className="size-4" />}
               Criar ordem
             </button>
           </footer>

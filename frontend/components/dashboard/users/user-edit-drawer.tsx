@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { X } from "lucide-react";
+import { LoadingSpinner } from "@/components/ui/loading";
 import type { User, UserUpdateInput } from "@/lib/api";
 
 const formSchema = z.object({
@@ -144,9 +145,9 @@ export function UserEditDrawer({
             <button
               type="submit"
               disabled={form.formState.isSubmitting}
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-brand-primary px-4 text-xs font-semibold text-white transition hover:bg-brand-primary-hover disabled:cursor-wait disabled:opacity-60"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-brand-primary px-4 text-xs font-semibold text-white transition hover:bg-brand-primary-hover disabled:cursor-wait disabled:opacity-60"
             >
-              {form.formState.isSubmitting ? "Salvando…" : "Salvar alterações"}
+              {form.formState.isSubmitting ? <><LoadingSpinner /> Salvando…</> : "Salvar alterações"}
             </button>
           </footer>
         </form>
