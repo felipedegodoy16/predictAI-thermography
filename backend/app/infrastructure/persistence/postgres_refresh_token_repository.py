@@ -76,6 +76,7 @@ class PostgresRefreshTokenRepository:
                 user_row = await connection.fetchrow(
                     """
                     SELECT u.id, u.name, u.email, u.password_hash, u.created_at,
+                           u.account_id, a.name AS account_name,
                            COALESCE((SELECT r.code FROM user_roles ur2 JOIN roles r ON r.id = ur2.role_id WHERE ur2.user_id = u.id LIMIT 1), 'user') AS role,
                            COALESCE(
                                array_agg(DISTINCT p.code)
@@ -83,11 +84,12 @@ class PostgresRefreshTokenRepository:
                                ARRAY[]::TEXT[]
                            ) AS permissions
                     FROM users AS u
+                    LEFT JOIN accounts AS a ON a.id = u.account_id
                     LEFT JOIN user_roles AS ur ON ur.user_id = u.id
                     LEFT JOIN role_permissions AS rp ON rp.role_id = ur.role_id
                     LEFT JOIN permissions AS p ON p.code = rp.permission_code
                     WHERE u.id = $1
-                    GROUP BY u.id
+                    GROUP BY u.id, a.id
                     """,
                     token_row["user_id"],
                 )
