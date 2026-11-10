@@ -1,4 +1,4 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import asyncpg
 
@@ -24,10 +24,11 @@ class PostgresAccountRepository(IAccountRepository):
                 "INSERT INTO accounts(name, slug) VALUES ($1, $2) RETURNING *",
                 name, slug,
             )
+            user_id = uuid4()
             user_row = await conn.fetchrow(
-                """INSERT INTO users(name, email, password_hash, account_id, created_at)
-                   VALUES ($1, $2, $3, $4, NOW()) RETURNING id""",
-                admin_name, admin_email, admin_password_hash, account_row["id"],
+                """INSERT INTO users(id, name, email, password_hash, account_id, created_at)
+                   VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id""",
+                user_id, admin_name, admin_email, admin_password_hash, account_row["id"],
             )
             await conn.execute(
                 "INSERT INTO user_roles(user_id, role_id) SELECT $1, id FROM roles WHERE code='admin'",
