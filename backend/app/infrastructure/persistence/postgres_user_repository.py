@@ -95,16 +95,51 @@ class PostgresUserRepository(IUserRepository):
             for row in rows
         ]
 
-    async def list_admin_emails(self, *, account_id: UUID) -> list[str]:
-        rows = await self._pool.fetch(
+    async def get_thermal_email_settings(self, *, user_id: UUID) -> dict[str, bool] | None:
+        row = await self._pool.fetchrow(
             """
-            SELECT DISTINCT u.email
-            FROM users AS u
-            JOIN user_roles AS ur ON ur.user_id = u.id
-            JOIN roles AS r ON r.id = ur.role_id
-            WHERE r.code = 'admin' AND u.account_id = $1
-            ORDER BY u.email
+            SELECT email_on_thermal_alert, email_on_thermal_alarm
+            FROM users WHERE id = $1
             """,
+            user_id,
+        )
+        if row is None:
+            return None
+        return {
+            "email_on_thermal_alert": row["email_on_thermal_alert"],
+            "email_on_thermal_alarm": row["email_on_thermal_alarm"],
+        }
+
+    async def update_thermal_email_settings(
+        self, *, user_id: UUID, email_on_thermal_alert: bool, email_on_thermal_alarm: bool
+    ) -> dict[str, bool] | None:
+        row = await self._pool.fetchrow(
+            """
+            UPDATE users
+            SET email_on_thermal_alert = $2,
+                email_on_thermal_alarm = $3
+            WHERE id = $1
+            RETURNING email_on_thermal_alert, email_on_thermal_alarm
+            """,
+            user_id,
+            email_on_thermal_alert,
+            email_on_thermal_alarm,
+        )
+        if row is None:
+            return None
+        return {
+            "email_on_thermal_alert": row["email_on_thermal_alert"],
+            "email_on_thermal_alarm": row["email_on_thermal_alarm"],
+        }
+
+    async def list_thermal_notification_emails(
+        self, *, account_id: UUID, notification_type: str
+    ) -> list[str]:
+        preference_column = (
+            "email_on_thermal_alarm" if notification_type == "alarm" else "email_on_thermal_alert"
+        )
+        rows = await self._pool.fetch(
+            f"SELECT email FROM users WHERE account_id = $1 AND {preference_column} IS TRUE ORDER BY email",
             account_id,
         )
         return [row["email"] for row in rows]
@@ -160,11 +195,14 @@ class PostgresUserRepository(IUserRepository):
                 async with connection.transaction():
                     row = await connection.fetchrow(
                         """
-                        INSERT INTO users (id, name, email, password_hash, created_at, account_id)
-                        VALUES ($1, $2, $3, $4, $5, $6)
+                        INSERT INTO users (
+                            id, name, email, password_hash, created_at, account_id,
+                            email_on_thermal_alarm
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
                         RETURNING id, name, email, password_hash, created_at, account_id,
                                   (SELECT name FROM accounts WHERE id = $6) AS account_name,
-                                  $7::TEXT AS role, ARRAY[]::TEXT[] AS permissions
+                                  $8::TEXT AS role, ARRAY[]::TEXT[] AS permissions
                         """,
                         user.id,
                         user.name,
@@ -172,6 +210,7 @@ class PostgresUserRepository(IUserRepository):
                         user.password_hash,
                         user.created_at,
                         user.account_id,
+                        user.role == "admin",
                         user.role,
                     )
                     await connection.execute(

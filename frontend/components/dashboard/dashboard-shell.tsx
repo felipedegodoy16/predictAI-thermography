@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   Images,
+  Settings,
   UsersRound,
   Wrench,
   X,
@@ -26,6 +27,7 @@ const navigation = [
   { label: "Equipamentos", href: "/equipamentos", icon: Wrench },
   { label: "Imagens termográficas", href: "/imagens-termograficas", icon: Images, testOnly: true },
   { label: "Usuários", href: "/usuarios", icon: UsersRound },
+  { label: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
 export function DashboardShell({ children }: { children: ReactNode }) {

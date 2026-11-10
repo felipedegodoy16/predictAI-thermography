@@ -17,7 +17,15 @@ class IUserRepository(Protocol):
 
     async def list_user_options(self, *, account_id: UUID | None = None) -> list[UserOption]: ...
 
-    async def list_admin_emails(self, *, account_id: UUID) -> list[str]: ...
+    async def get_thermal_email_settings(self, *, user_id: UUID) -> dict[str, bool] | None: ...
+
+    async def update_thermal_email_settings(
+        self, *, user_id: UUID, email_on_thermal_alert: bool, email_on_thermal_alarm: bool
+    ) -> dict[str, bool] | None: ...
+
+    async def list_thermal_notification_emails(
+        self, *, account_id: UUID, notification_type: str
+    ) -> list[str]: ...
 
     async def update_profile(
         self, *, user_id: UUID, name: str | None, email: str | None,

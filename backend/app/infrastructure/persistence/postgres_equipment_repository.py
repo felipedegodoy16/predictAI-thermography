@@ -20,11 +20,11 @@ class PostgresEquipmentRepository:
             row = await connection.fetchrow(
                 """INSERT INTO equipment
                    (id, code, name, equipment_type, manufacturer,
-                    yellow_limit_c, red_limit_c, model,
+                    yellow_limit_c, red_limit_c, capture_interval_seconds, model,
                     serial_number, asset_tag, location, criticality,
                     installation_date, notes, specifications, manual_file_name, account_id)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                           $12, $13, $14, $15::jsonb, $16, $17)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                           $13, $14, $15, $16::jsonb, $17, $18)
                    RETURNING *""",
                 equipment_id,
                 code,
@@ -33,6 +33,7 @@ class PostgresEquipmentRepository:
                 payload.get("manufacturer"),
                 payload["yellow_limit_c"],
                 payload["red_limit_c"],
+                payload["capture_interval_seconds"],
                 payload.get("model"),
                 payload.get("serial_number"),
                 payload.get("asset_tag"),
@@ -60,14 +61,15 @@ class PostgresEquipmentRepository:
                    manufacturer = $4,
                    yellow_limit_c = $5,
                    red_limit_c = $6,
-                   model = $7,
-                   serial_number = $8,
-                   asset_tag = $9,
-                   location = $10,
-                   criticality = $11,
-                   installation_date = $12,
-                   notes = $13
-               WHERE id = $1 AND ($14::UUID IS NULL OR account_id = $14)
+                   capture_interval_seconds = $7,
+                   model = $8,
+                   serial_number = $9,
+                   asset_tag = $10,
+                   location = $11,
+                   criticality = $12,
+                   installation_date = $13,
+                   notes = $14
+               WHERE id = $1 AND ($15::UUID IS NULL OR account_id = $15)
                RETURNING *""",
             equipment_id,
             payload["name"],
@@ -75,6 +77,7 @@ class PostgresEquipmentRepository:
             payload["manufacturer"],
             payload["yellow_limit_c"],
             payload["red_limit_c"],
+            payload["capture_interval_seconds"],
             payload.get("model"),
             payload.get("serial_number"),
             payload.get("asset_tag"),

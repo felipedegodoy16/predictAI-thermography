@@ -6,6 +6,7 @@ import { Eye, Image, Pencil, Plus, Search, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { EquipmentCreateDrawer } from "@/components/dashboard/equipment/equipment-create-drawer";
 import { EquipmentDetailDrawer } from "@/components/dashboard/equipment/equipment-detail-drawer";
+import { formatCadence } from "@/components/dashboard/equipment/cadence";
 import {
   getEquipmentTypes,
   listEquipments,
@@ -18,14 +19,12 @@ const CRITICALITY_LABELS = {
   BAIXA: "Baixa",
   MEDIA: "Média",
   ALTA: "Alta",
-  CRITICA: "Crítica",
 } as const;
 
 const CRITICALITY_STYLES = {
   BAIXA: "bg-slate-100 text-slate-600",
   MEDIA: "bg-sky-50 text-sky-700",
   ALTA: "bg-amber-50 text-amber-800",
-  CRITICA: "bg-rose-50 text-rose-700",
 } as const;
 
 export function EquipmentPage() {
@@ -210,6 +209,7 @@ function EquipmentCard({ equipment, types, onDetails, onEdit }: { equipment: Equ
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[11px]">
         {equipment.yellowLimitC !== null ? <EquipmentFact label="Alerta" value={`${equipment.yellowLimitC.toLocaleString("pt-BR")} °C`} /> : null}
         {equipment.redLimitC !== null ? <EquipmentFact label="Alarme" value={`${equipment.redLimitC.toLocaleString("pt-BR")} °C`} /> : null}
+        <EquipmentFact label="Cadência" value={formatCadence(equipment.captureIntervalSeconds)} />
         {equipment.manualFileName ? <EquipmentFact label="Manual" value={equipment.manualFileName} /> : null}
         {equipment.assetTag ? <EquipmentFact label="Patrimônio" value={equipment.assetTag} /> : null}
         {equipment.location ? <EquipmentFact label="Local" value={equipment.location} /> : null}

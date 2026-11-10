@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { Download, FileText, X } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { getEquipmentManual, type Equipment, type EquipmentTypeOption } from "@/lib/api";
+import { formatCadence } from "./cadence";
 
 const CRITICALITY_LABELS = {
   BAIXA: "Baixa",
   MEDIA: "Média",
   ALTA: "Alta",
-  CRITICA: "Crítica",
 } as const;
 
 export function EquipmentDetailDrawer({
@@ -79,6 +79,7 @@ export function EquipmentDetailDrawer({
               <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
                 <DetailFact label="Limite de alerta" value={formatLimit(equipment.yellowLimitC)} />
                 <DetailFact label="Limite do alarme" value={formatLimit(equipment.redLimitC)} />
+                <DetailFact label="Cadência da captura" value={formatCadence(equipment.captureIntervalSeconds)} />
                 <DetailFact label="Criticidade" value={CRITICALITY_LABELS[equipment.criticality]} />
                 <DetailFact label="Patrimônio" value={equipment.assetTag} />
                 <DetailFact label="Fabricante" value={equipment.manufacturer} />

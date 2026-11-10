@@ -20,6 +20,7 @@ from app.presentation.schemas.users import (
     UserCreate,
     UserOptionResponse,
     UserResponse,
+    ThermalEmailSettings,
     UserUpdate,
 )
 
@@ -169,6 +170,41 @@ async def get_my_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
     return UserResponse(id=user.id, name=user.name, email=user.email, role=user.role, created_at=user.created_at, account_id=user.account_id, account_name=user.account_name)
+
+
+@router.get(
+    "/me/notification-settings",
+    response_model=ThermalEmailSettings,
+    summary="Get the current user's thermal email settings",
+)
+async def get_my_notification_settings(
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    repository: Annotated[IUserRepository, Depends(get_user_repository)],
+) -> ThermalEmailSettings:
+    settings = await repository.get_thermal_email_settings(user_id=current_user.id)
+    if settings is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    return ThermalEmailSettings(**settings)
+
+
+@router.patch(
+    "/me/notification-settings",
+    response_model=ThermalEmailSettings,
+    summary="Update the current user's thermal email settings",
+)
+async def update_my_notification_settings(
+    payload: ThermalEmailSettings,
+    current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    repository: Annotated[IUserRepository, Depends(get_user_repository)],
+) -> ThermalEmailSettings:
+    settings = await repository.update_thermal_email_settings(
+        user_id=current_user.id,
+        email_on_thermal_alert=payload.email_on_thermal_alert,
+        email_on_thermal_alarm=payload.email_on_thermal_alarm,
+    )
+    if settings is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    return ThermalEmailSettings(**settings)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Delete a user")

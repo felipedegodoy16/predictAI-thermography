@@ -56,6 +56,13 @@ class UserResponse(BaseModel):
     account_name: str | None = None
 
 
+class ThermalEmailSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email_on_thermal_alert: bool
+    email_on_thermal_alarm: bool
+
+
 class UserOptionResponse(BaseModel):
     id: UUID
     name: str

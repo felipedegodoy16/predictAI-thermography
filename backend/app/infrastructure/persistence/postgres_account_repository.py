@@ -26,8 +26,11 @@ class PostgresAccountRepository(IAccountRepository):
             )
             user_id = uuid4()
             user_row = await conn.fetchrow(
-                """INSERT INTO users(id, name, email, password_hash, account_id, created_at)
-                   VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id""",
+                """INSERT INTO users(
+                       id, name, email, password_hash, account_id, created_at,
+                       email_on_thermal_alarm
+                   )
+                   VALUES ($1, $2, $3, $4, $5, NOW(), TRUE) RETURNING id""",
                 user_id, admin_name, admin_email, admin_password_hash, account_row["id"],
             )
             await conn.execute(

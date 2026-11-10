@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.domain.entity.equipment import EQUIPMENT_TYPE_OPTIONS, EquipmentType
 
 
-EquipmentCriticality = Literal["BAIXA", "MEDIA", "ALTA", "CRITICA"]
+EquipmentCriticality = Literal["BAIXA", "MEDIA", "ALTA"]
 
 
 class EquipmentTypeOption(BaseModel):
@@ -38,6 +38,7 @@ class EquipmentCreate(BaseModel):
     manufacturer: Annotated[str, Field(min_length=1, max_length=120)] = Field(alias="fabricante")
     yellow_limit_c: float = Field(alias="limite_amarelo_c", allow_inf_nan=False)
     red_limit_c: float = Field(alias="limite_vermelho_c", allow_inf_nan=False)
+    capture_interval_seconds: int = Field(default=3600, ge=60, multiple_of=60, alias="cadencia_segundos")
     model: str | None = Field(default=None, max_length=120, alias="modelo")
     serial_number: str | None = Field(default=None, max_length=120, alias="numero_serie")
     asset_tag: str | None = Field(default=None, max_length=80, alias="patrimonio")
@@ -51,7 +52,7 @@ class EquipmentCreate(BaseModel):
         if self.red_limit_c <= self.yellow_limit_c:
             raise ValueError("O limite vermelho deve ser maior que o limite amarelo.")
         if self.name and len(self.name) < 2:
-            raise ValueError("A identificação deve ter pelo menos 2 caracteres.")
+            raise ValueError("A tag do equipamento deve ter pelo menos 2 caracteres.")
         if not self.name:
             self.name = f"{self.manufacturer} · {EQUIPMENT_TYPE_OPTIONS[self.equipment_type]['label']}"
         return self
@@ -69,6 +70,7 @@ class EquipmentUpdate(BaseModel):
     manufacturer: Annotated[str, Field(min_length=1, max_length=120)] | None = Field(default=None, alias="fabricante")
     yellow_limit_c: float | None = Field(default=None, alias="limite_amarelo_c", allow_inf_nan=False)
     red_limit_c: float | None = Field(default=None, alias="limite_vermelho_c", allow_inf_nan=False)
+    capture_interval_seconds: int | None = Field(default=None, ge=60, multiple_of=60, alias="cadencia_segundos")
     model: Annotated[str, Field(max_length=120)] | None = Field(default=None, alias="modelo")
     serial_number: Annotated[str, Field(max_length=120)] | None = Field(default=None, alias="numero_serie")
     asset_tag: Annotated[str, Field(max_length=80)] | None = Field(default=None, alias="patrimonio")
@@ -88,6 +90,7 @@ class EquipmentResponse(BaseModel):
     manufacturer: str | None = Field(alias="fabricante")
     yellow_limit_c: float | None = Field(default=None, alias="limite_amarelo_c")
     red_limit_c: float | None = Field(default=None, alias="limite_vermelho_c")
+    capture_interval_seconds: int = Field(default=3600, alias="cadencia_segundos")
     model: str | None = Field(alias="modelo")
     serial_number: str | None = Field(alias="numero_serie")
     asset_tag: str | None = Field(alias="patrimonio")

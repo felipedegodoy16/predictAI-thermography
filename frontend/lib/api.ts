@@ -28,6 +28,11 @@ export interface User {
   account_name?: string | null;
 }
 
+export interface ThermalEmailSettings {
+  email_on_thermal_alert: boolean;
+  email_on_thermal_alarm: boolean;
+}
+
 export interface Account {
   id: string;
   name: string;
@@ -133,7 +138,7 @@ export type EquipmentType =
   | "COMPRESSOR"
   | "OUTRO";
 
-export type EquipmentCriticality = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
+export type EquipmentCriticality = "BAIXA" | "MEDIA" | "ALTA";
 
 export interface EquipmentTypeOption {
   equipmentType: EquipmentType;
@@ -148,6 +153,7 @@ export interface Equipment {
   manufacturer: string | null;
   yellowLimitC: number | null;
   redLimitC: number | null;
+  captureIntervalSeconds: number;
   model: string | null;
   serialNumber: string | null;
   assetTag: string | null;
@@ -165,6 +171,7 @@ export interface EquipmentInput {
   manufacturer: string;
   yellowLimitC: number;
   redLimitC: number;
+  captureIntervalSeconds: number;
   model?: string;
   serialNumber?: string;
   assetTag?: string;
@@ -518,6 +525,23 @@ export function getMyUser(): Promise<User> {
   return request<User>("/users/me", { method: "GET", authenticated: true });
 }
 
+export function getMyNotificationSettings(): Promise<ThermalEmailSettings> {
+  return request<ThermalEmailSettings>("/users/me/notification-settings", {
+    method: "GET",
+    authenticated: true,
+  });
+}
+
+export function updateMyNotificationSettings(
+  settings: ThermalEmailSettings,
+): Promise<ThermalEmailSettings> {
+  return request<ThermalEmailSettings>("/users/me/notification-settings", {
+    method: "PATCH",
+    body: settings,
+    authenticated: true,
+  });
+}
+
 export function listAccounts(): Promise<Account[]> {
   return request<Account[]>("/accounts", { method: "GET", authenticated: true });
 }
@@ -648,6 +672,7 @@ function normalizeEquipment(value: unknown): Equipment {
       ? null : Number(valueOf(equipment, "limite_amarelo_c", "yellow_limit_c")),
     redLimitC: valueOf(equipment, "limite_vermelho_c", "red_limit_c") == null
       ? null : Number(valueOf(equipment, "limite_vermelho_c", "red_limit_c")),
+    captureIntervalSeconds: Number(valueOf(equipment, "cadencia_segundos", "capture_interval_seconds") ?? 3600),
     model: (valueOf(equipment, "modelo", "model") as string | null) ?? null,
     serialNumber: (valueOf(equipment, "numero_serie", "serial_number") as string | null) ?? null,
     assetTag: (valueOf(equipment, "patrimonio", "asset_tag") as string | null) ?? null,
@@ -699,6 +724,7 @@ export async function createEquipment(input: EquipmentInput, manual?: File): Pro
       fabricante: input.manufacturer,
       limite_amarelo_c: input.yellowLimitC,
       limite_vermelho_c: input.redLimitC,
+      cadencia_segundos: input.captureIntervalSeconds,
       modelo: input.model || null,
       numero_serie: input.serialNumber || null,
       patrimonio: input.assetTag || null,
@@ -724,6 +750,7 @@ export async function updateEquipment(id: number, input: EquipmentInput): Promis
       fabricante: input.manufacturer,
       limite_amarelo_c: input.yellowLimitC,
       limite_vermelho_c: input.redLimitC,
+      cadencia_segundos: input.captureIntervalSeconds,
       modelo: input.model || null,
       numero_serie: input.serialNumber || null,
       patrimonio: input.assetTag || null,

@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 
 from app.core.config import BACKEND_DIR, settings
 from app.infrastructure.persistence.postgres_equipment_repository import PostgresEquipmentRepository
-from app.infrastructure.email.thermal_alarm import send_thermal_alarm_email
+from app.infrastructure.email.thermal_alarm import send_thermal_notification_email
 from app.infrastructure.persistence.postgres_thermographic_image_repository import (
     PostgresThermographicImageRepository,
 )
@@ -169,32 +169,42 @@ async def upload_thermographic_image(
         red_limit,
     )
     response_data = dict(created)
-    if maximum >= red_limit:
+    notification_type: Literal["alert", "alarm"] | None = (
+        "alarm" if maximum >= red_limit else "alert" if maximum >= yellow_limit else None
+    )
+    if notification_type is not None:
+        response_key = "alarm_email_sent" if notification_type == "alarm" else "alert_email_sent"
         try:
-            admin_emails = await user_repository.list_admin_emails(account_id=equipment["account_id"])
-            if admin_emails:
-                response_data["alarm_email_sent"] = await asyncio.to_thread(
-                    send_thermal_alarm_email,
-                    recipients=admin_emails,
+            recipients = await user_repository.list_thermal_notification_emails(
+                account_id=equipment["account_id"],
+                notification_type=notification_type,
+            )
+            if recipients:
+                response_data[response_key] = await asyncio.to_thread(
+                    send_thermal_notification_email,
+                    recipients=recipients,
+                    notification_type=notification_type,
                     equipment_code=str(equipment.get("code", equipment_id)),
                     equipment_name=str(equipment.get("name", "Equipamento")),
                     maximum_temperature=float(maximum),
-                    alarm_limit=red_limit,
+                    trigger_limit=red_limit if notification_type == "alarm" else yellow_limit,
                     normal_image_path=PROCESSED_DIR / processed.visible_image_file_name,
                     thermal_image_path=PROCESSED_DIR / processed.thermal_image_file_name,
                     settings=settings,
                 )
             else:
-                response_data["alarm_email_sent"] = False
+                response_data[response_key] = False
                 logger.warning(
-                    "thermography.alarm_email.skipped reason=no_admin_recipients equipment_id=%s image_id=%s",
+                    "thermography.%s_email.skipped reason=no_opted_in_recipients equipment_id=%s image_id=%s",
+                    notification_type,
                     equipment_id,
                     created["id"],
                 )
         except Exception:
-            response_data["alarm_email_sent"] = False
+            response_data[response_key] = False
             logger.exception(
-                "thermography.alarm_email.failed equipment_id=%s image_id=%s",
+                "thermography.%s_email.failed equipment_id=%s image_id=%s",
+                notification_type,
                 equipment_id,
                 created["id"],
             )

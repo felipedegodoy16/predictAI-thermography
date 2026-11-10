@@ -150,6 +150,7 @@ async def update_equipment(
         "manufacturer",
         "yellow_limit_c",
         "red_limit_c",
+        "capture_interval_seconds",
         "model",
         "serial_number",
         "asset_tag",

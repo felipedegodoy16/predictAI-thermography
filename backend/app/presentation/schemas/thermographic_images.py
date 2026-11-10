@@ -18,4 +18,5 @@ class ThermographicImageResponse(BaseModel):
     metadata_file_name: str = Field(alias="arquivo_metadados")
     analysis_metadata: dict[str, Any] = Field(alias="metadados")
     created_at: datetime = Field(alias="data_criacao")
+    alert_email_sent: bool | None = Field(default=None, alias="email_alerta_enviado")
     alarm_email_sent: bool | None = Field(default=None, alias="email_alarme_enviado")

@@ -4,6 +4,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { FileUp, X } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { createEquipment, updateEquipment, type Equipment, type EquipmentCriticality, type EquipmentInput, type EquipmentTypeOption } from "@/lib/api";
+import { getCadenceParts, type CadenceUnit } from "./cadence";
 
 const inputClass = "min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/10";
 
@@ -19,7 +20,10 @@ export function EquipmentCreateDrawer({
   onSaved: (editing: boolean) => Promise<void>;
 }) {
   const editing = Boolean(equipment);
+  const initialCadence = getCadenceParts(equipment?.captureIntervalSeconds ?? 3600);
   const [equipmentType, setEquipmentType] = useState(equipment?.equipmentType ?? types[0]?.equipmentType ?? "MOTOR_ELETRICO");
+  const [cadenceUnit, setCadenceUnit] = useState<CadenceUnit>(initialCadence.unit);
+  const [cadenceValue, setCadenceValue] = useState(initialCadence.value);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [manual, setManual] = useState<File>();
@@ -29,12 +33,26 @@ export function EquipmentCreateDrawer({
     setSaving(true);
     setError("");
     const form = new FormData(event.currentTarget);
+    const cadenceValue = Number(form.get("cadenceValue"));
+    const exactIntervalSeconds = cadenceValue * Number(form.get("cadenceUnit"));
+    const captureIntervalSeconds = Math.round(exactIntervalSeconds);
+    if (
+      !Number.isSafeInteger(captureIntervalSeconds)
+      || captureIntervalSeconds < 60
+      || captureIntervalSeconds % 60 !== 0
+      || Math.abs(exactIntervalSeconds - captureIntervalSeconds) > 1e-8
+    ) {
+      setError("Informe uma cadência equivalente a pelo menos 1 minuto completo.");
+      setSaving(false);
+      return;
+    }
     const input: EquipmentInput = {
       name: String(form.get("name") ?? "").trim(),
       equipmentType,
       manufacturer: String(form.get("manufacturer") ?? "").trim(),
       yellowLimitC: Number(form.get("yellowLimitC")),
       redLimitC: Number(form.get("redLimitC")),
+      captureIntervalSeconds,
       model: optionalValue(form, "model"),
       serialNumber: optionalValue(form, "serialNumber"),
       assetTag: optionalValue(form, "assetTag"),
@@ -77,8 +95,8 @@ export function EquipmentCreateDrawer({
         <form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-1 flex-col">
           <div className="space-y-4 overflow-y-auto p-4 sm:space-y-5 sm:p-6">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Identificação do equipamento">
-                <input name="name" maxLength={200} defaultValue={equipment?.name ?? ""} autoFocus placeholder="Ex.: Motor da bomba principal" className={inputClass} />
+              <Field label="Tag do equipamento">
+                <input name="name" maxLength={200} defaultValue={equipment?.name ?? ""} autoFocus placeholder="Ex.: P-101" className={inputClass} />
               </Field>
               <Field label="Tipo" required>
                 <select
@@ -113,11 +131,31 @@ export function EquipmentCreateDrawer({
                   <option value="BAIXA">Baixa</option>
                   <option value="MEDIA">Média</option>
                   <option value="ALTA">Alta</option>
-                  <option value="CRITICA">Crítica</option>
                 </select>
               </Field>
               <Field label="Data de instalação">
                 <input name="installationDate" type="date" defaultValue={equipment?.installationDate ?? ""} className={inputClass} />
+              </Field>
+              <Field label="Cadência da captura" required>
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] gap-2">
+                  <input name="cadenceValue" type="number" min={cadenceUnit === "hours" ? 1 / 60 : 1} step="any" required value={cadenceValue} onChange={(event) => setCadenceValue(Number(event.target.value))} aria-label="Valor da cadência" className={inputClass} />
+                  <select
+                    name="cadenceUnit"
+                    value={cadenceUnit === "hours" ? 3600 : 60}
+                    onChange={(event) => {
+                      const nextUnit: CadenceUnit = Number(event.target.value) === 3600 ? "hours" : "minutes";
+                      const currentMultiplier = cadenceUnit === "hours" ? 3600 : 60;
+                      const nextMultiplier = nextUnit === "hours" ? 3600 : 60;
+                      setCadenceValue((value) => value * currentMultiplier / nextMultiplier);
+                      setCadenceUnit(nextUnit);
+                    }}
+                    className={inputClass}
+                  >
+                    <option value={60}>Minutos</option>
+                    <option value={3600}>Horas</option>
+                  </select>
+                </div>
+                <span className="mt-1 block text-[11px] font-normal text-slate-400">O intervalo será armazenado em segundos.</span>
               </Field>
             </div>
 
