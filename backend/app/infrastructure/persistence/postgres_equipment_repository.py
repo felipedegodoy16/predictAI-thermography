@@ -68,7 +68,8 @@ class PostgresEquipmentRepository:
                    location = $11,
                    criticality = $12,
                    installation_date = $13,
-                   notes = $14
+                   notes = $14,
+                   manual_file_name = COALESCE($16, manual_file_name)
                WHERE id = $1 AND ($15::UUID IS NULL OR account_id = $15)
                RETURNING *""",
             equipment_id,
@@ -86,6 +87,7 @@ class PostgresEquipmentRepository:
             payload.get("installation_date"),
             payload.get("notes"),
             self._account_id,
+            payload.get("manual_file_name"),
         )
         return self._to_dict(row) if row else None
 

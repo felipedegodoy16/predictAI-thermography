@@ -5,9 +5,10 @@ from uuid import UUID, uuid4
 
 import asyncpg
 import httpx
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from app.domain.entity.equipment import EquipmentType
 from app.infrastructure.ai.groq_equipment_advisor import (
@@ -134,10 +135,31 @@ async def list_equipments(
 )
 async def update_equipment(
     equipment_id: int,
-    payload: EquipmentUpdate,
+    request: Request,
     _: CurrentUser,
     repository: Repository,
 ) -> EquipmentResponse:
+    manual: StarletteUploadFile | None = None
+    if request.headers.get("content-type", "").startswith("multipart/form-data"):
+        form = await request.form()
+        raw_payload = form.get("payload")
+        uploaded_manual = form.get("manual")
+        if not isinstance(raw_payload, str):
+            raise HTTPException(status_code=422, detail="Informe os dados do equipamento.")
+        if uploaded_manual is not None:
+            if not isinstance(uploaded_manual, StarletteUploadFile):
+                raise HTTPException(status_code=422, detail="Arquivo de manual inválido.")
+            manual = uploaded_manual
+        try:
+            payload = EquipmentUpdate.model_validate_json(raw_payload)
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail=error.errors(include_context=False)) from error
+    else:
+        try:
+            payload = EquipmentUpdate.model_validate(await request.json())
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail=error.errors(include_context=False)) from error
+
     current = await repository.get(equipment_id)
     if current is None:
         raise HTTPException(status_code=404, detail="Equipamento não encontrado.")
@@ -166,18 +188,47 @@ async def update_equipment(
     except ValidationError as error:
         raise HTTPException(status_code=422, detail=error.errors(include_context=False)) from error
 
+    stored_path: Path | None = None
+    if manual is not None:
+        original_name = Path(manual.filename or "manual.pdf").name
+        if Path(original_name).suffix.lower() != ".pdf" or manual.content_type not in {
+            "application/pdf", "application/octet-stream"
+        }:
+            raise HTTPException(status_code=415, detail="Envie o manual em formato PDF.")
+        content = await manual.read(MAX_MANUAL_SIZE + 1)
+        if len(content) > MAX_MANUAL_SIZE:
+            raise HTTPException(status_code=413, detail="O manual deve ter no máximo 25 MB.")
+        if not content.startswith(b"%PDF-"):
+            raise HTTPException(status_code=415, detail="O arquivo enviado não é um PDF válido.")
+        stored_path = MANUALS_DIR / f"manual_equipamento_{uuid4().hex}.pdf"
+        await asyncio.to_thread(MANUALS_DIR.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(stored_path.write_bytes, content)
+
+    update_payload = validated_payload.model_dump(by_alias=False)
+    if stored_path:
+        update_payload["manual_file_name"] = stored_path.name
     try:
-        updated = await repository.update(
-            equipment_id,
-            validated_payload.model_dump(by_alias=False),
-        )
+        updated = await repository.update(equipment_id, update_payload)
     except asyncpg.UniqueViolationError:
+        if stored_path:
+            stored_path.unlink(missing_ok=True)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Já existe um equipamento com este código patrimonial.",
         ) from None
+    except Exception:
+        if stored_path:
+            stored_path.unlink(missing_ok=True)
+        raise
     if updated is None:
+        if stored_path:
+            stored_path.unlink(missing_ok=True)
         raise HTTPException(status_code=404, detail="Equipamento não encontrado.")
+    if stored_path:
+        old_filename = current.get("manual_file_name")
+        old_path = MANUALS_DIR / old_filename if old_filename and Path(old_filename).name == old_filename else None
+        if old_path:
+            await asyncio.to_thread(old_path.unlink, missing_ok=True)
     return EquipmentResponse.model_validate(updated)
 
 

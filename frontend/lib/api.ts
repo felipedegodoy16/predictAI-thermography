@@ -741,10 +741,8 @@ export async function createEquipment(input: EquipmentInput, manual?: File): Pro
   return normalizeEquipment(result);
 }
 
-export async function updateEquipment(id: number, input: EquipmentInput): Promise<Equipment> {
-  const result = await request<unknown>(`/equipamentos/${id}`, {
-    method: "PATCH",
-    body: {
+export async function updateEquipment(id: number, input: EquipmentInput, manual?: File): Promise<Equipment> {
+  const payload = {
       nome: input.name || "",
       tipo: input.equipmentType,
       fabricante: input.manufacturer,
@@ -758,7 +756,13 @@ export async function updateEquipment(id: number, input: EquipmentInput): Promis
       criticidade: input.criticality,
       data_instalacao: input.installationDate || null,
       observacoes: input.notes || null,
-    },
+  };
+  const formData = new FormData();
+  formData.set("payload", JSON.stringify(payload));
+  if (manual) formData.set("manual", manual);
+  const result = await request<unknown>(`/equipamentos/${id}`, {
+    method: "PATCH",
+    body: formData,
     authenticated: true,
   });
   return normalizeEquipment(result);
